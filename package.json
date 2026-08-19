@@ -1,0 +1,10 @@
+{
+  "name": "oscar-risan-simracing-portal",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "preflight": "node scripts/preflight.mjs",
+    "test:local": "node tests/local-server.mjs"
+  },
+  "type": "module"
+}
