@@ -44,6 +44,23 @@
   .detail-box small{font-size:8px;line-height:1.15;letter-spacing:.05em;margin-bottom:3px;overflow-wrap:anywhere}
   .detail-box b{display:block;font-size:11px;line-height:1.25;font-weight:800;overflow-wrap:anywhere;word-break:break-word}
   .detail-source{font-size:9px;line-height:1.35;margin-top:10px;padding-top:9px;overflow-wrap:anywhere}
+
+  /* Noticias: lectura más aireada en smartphone */
+  #news.grid{gap:16px}
+  #news .card{border-radius:15px}
+  #news .card img{aspect-ratio:16/8.6}
+  #news .body{padding:18px 17px 17px}
+  #news .meta{gap:8px;margin-bottom:9px;font-size:9px;align-items:flex-start}
+  #news .meta>span{min-width:0;flex-wrap:wrap;row-gap:5px}
+  #news .meta time{padding-top:3px;font-size:9px}
+  #news .logo{min-width:38px;height:21px;padding:0 6px;font-size:8px;margin-right:6px}
+  #news .source{font-size:10px;line-height:1.45;margin-bottom:11px}
+  #news .tags{gap:5px;margin-bottom:12px}
+  #news .tag{font-size:8px;padding:4px 7px}
+  #news .card h3{font-size:19px;line-height:1.32;margin-bottom:11px}
+  #news .card p{font-size:14px;line-height:1.65;margin-bottom:16px;-webkit-line-clamp:5}
+  #news .read{min-height:40px;font-size:12px}
+  #noticias .head{margin-bottom:20px}
 }
 
 @media (max-width:390px){
@@ -53,4 +70,7 @@
   .event-meta{grid-template-columns:1fr;font-size:10.5px}
   .detail-grid{grid-template-columns:1fr}
   .event-dialog h2{font-size:18px}
+  #news .body{padding:16px 15px}
+  #news .card h3{font-size:18px}
+  #news .card p{font-size:13.5px;line-height:1.62}
 }
