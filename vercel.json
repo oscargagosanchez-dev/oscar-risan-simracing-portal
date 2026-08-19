@@ -1,0 +1,32 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/news",
+      "destination": "https://oscar-risan-simracing-web-v7-l3ezrds1x.vercel.app/api/news"
+    },
+    {
+      "source": "/article.html",
+      "destination": "https://oscar-risan-simracing-web-v7-l3ezrds1x.vercel.app/article.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets-(.*).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/api/health",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ]
+}
