@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oscar Risan SimRacing</title>
+<meta name="description" content="Noticias de SimRacing en castellano, Twitch, YouTube, X, hardware y agenda de eventos.">
+<link rel="stylesheet" href="/styles.css">
+<script src="/img-spa-lmp2-lmgt3.js"></script><script src="/img-spa-wet-multiclass.js"></script><script src="/img-lemans-hypercar-lmgt3.js"></script><script src="/img-monza-gt3.js"></script><script src="/img-nurburgring-dtm.js"></script><script src="/img-hockenheim-super-touring.js"></script><script src="/img-silverstone-roadster.js"></script><script src="/img-suzuka-gt.js"></script></head>
+<body>
+<header class="top"><a class="brand" href="#"><span class="mark">OR</span><span><b>OSCAR RISAN</b><small>SIMRACING</small></span></a><nav><a href="#eventos">Eventos</a><a href="#noticias">Noticias</a><a href="#canales">Canales</a><a href="#directo">Twitch</a><a href="#videos">YouTube</a><a href="#social">X</a></nav></header>
+<main>
+<section class="hero"><div><span class="ey">SIMRACING EN CASTELLANO</span><h1>El paddock digital del SimRacing.</h1><p>Noticias, hardware, directos, vídeos, competición y ahora también una agenda visual y unificada de qué se corre en cada simulador.</p></div><div class="hero-card"><span class="ey">LIVE HUB</span><h2>Oscar Risan</h2><p>LMU · RaceRoom · Assetto Corsa · AMS2 · ETS2 · ATS</p></div></section>
+<div class="ticker">LE MANS ULTIMATE · AUTOMOBILISTA 2 · ASSETTO CORSA EVO · ASSETTO CORSA RALLY · RACEROOM · ETS2 · ATS · HARDWARE</div>
+<section id="eventos" class="sec event-hero">
+  <div class="event-top"><div><span class="ey">EVENTOS OFICIALES Y COMBINACIONES</span><h2 style="margin:8px 0 0;font-size:42px">¿Dónde correr?</h2></div><div class="event-date" id="todayDate"></div></div>
+  <div class="week-tabs" id="weekTabs"><button class="week-tab active" data-week="today">Hoy</button><button class="week-tab" data-week="current">Esta semana</button><button class="week-tab" data-week="next">Próxima semana</button></div>
+  <div class="freshness" id="freshness"></div>
+  <div class="eventnav" id="eventnav"></div>
+  <div class="events-grid" id="eventCards"></div>
+  <div class="agenda-wrap" id="agenda">
+    <div class="agenda-title"><h3>🗓 Agenda cronológica</h3><span class="event-date">Se actualiza con los filtros anteriores</span></div>
+    <div class="schedule-list" id="scheduleList"></div>
+  </div>
+</section>
+<section id="canales" class="sec"><div class="head"><div><span class="ey">MIS CANALES</span><h2>Entra con un clic</h2></div><p>Directos, vídeos y actualidad</p></div><div class="channels"><a class="channel" href="https://www.twitch.tv/oscarrisan" target="_blank"><span class="cm"><span class="ico">TW</span><span><b>Twitch</b><small>twitch.tv/oscarrisan</small></span></span><span>→</span></a><a class="channel" href="https://www.youtube.com/@oscarrisansimracing6480" target="_blank"><span class="cm"><span class="ico">YT</span><span><b>YouTube</b><small>Oscar Risan SimRacing</small></span></span><span>→</span></a><a class="channel" href="https://x.com/oscarrisan" target="_blank"><span class="cm"><span class="ico">X</span><span><b>X</b><small>@oscarrisan</small></span></span><span>→</span></a></div></section>
+<section id="noticias" class="sec"><div class="head"><div><span class="ey">PADDOCK NEWS</span><h2 id="newsTitle">Últimas noticias</h2></div><p>En castellano · fuentes oficiales y medios especializados</p></div><div id="news" class="grid"><div class="empty">Cargando noticias…</div></div></section>
+<section id="directo" class="sec"><div class="head"><div><span class="ey">TWITCH</span><h2>Oscar Risan en directo</h2></div><a href="https://www.twitch.tv/oscarrisan" target="_blank">Abrir Twitch →</a></div><div class="live"><iframe id="tp" allowfullscreen></iframe><iframe id="tc"></iframe></div></section>
+<section id="videos" class="sec"><div class="head"><div><span class="ey">YOUTUBE</span><h2>Últimos vídeos</h2></div><a href="https://www.youtube.com/@oscarrisansimracing6480" target="_blank">Abrir canal →</a></div><div id="yv" class="videos"><div class="empty">Cargando vídeos…</div></div></section>
+<section id="social" class="sec"><div class="head"><div><span class="ey">X</span><h2>@oscarrisan</h2></div><a href="https://x.com/oscarrisan" target="_blank">Abrir X →</a></div><a class="twitter-timeline" data-theme="dark" data-height="520" href="https://twitter.com/oscarrisan">Tweets de @oscarrisan</a></section>
+</main>
+<div class="event-modal" id="eventModal" aria-hidden="true"><div class="event-dialog"><div class="modal-visual"><img id="modalEventImage" src="" alt=""></div><div class="event-dialog-head"><div><span class="ey" id="modalSim"></span><h2 id="modalTitle"></h2><div class="track" id="modalTrack"></div></div><button class="close-modal" id="closeEventModal" aria-label="Cerrar">×</button></div><div class="detail-tags" id="modalTags"></div><div class="detail-grid" id="modalDetails"></div><div class="detail-source" id="modalSource"></div></div></div>
+<footer><b>OSCAR RISAN SIMRACING</b><span>Twitch · YouTube · X · Noticias · Hardware · Eventos</span></footer>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+<script src="/app.js" defer></script>
+</body>
+</html>
