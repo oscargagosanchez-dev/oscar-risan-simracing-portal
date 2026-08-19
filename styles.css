@@ -42,3 +42,21 @@ button{border:1px solid var(--line);background:#0d1117;color:#d6dde5;border-radi
  .mobile-bottom{position:fixed;z-index:50;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));display:grid!important;grid-template-columns:repeat(4,1fr);gap:2px;padding:7px;background:rgba(14,18,25,.94);border:1px solid #303a47;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.45);backdrop-filter:blur(18px)}.mobile-bottom a{display:flex;min-height:50px;align-items:center;justify-content:center;flex-direction:column;gap:2px;border-radius:12px;color:#c8d0d9;font-weight:800}.mobile-bottom a:active{background:#222a35}.mobile-bottom span{font-size:17px;line-height:1}.mobile-bottom small{font-size:9px}
 }
 @media(max-width:390px){.hero h1{font-size:36px}.event-top h2{font-size:31px!important}.detail-grid{grid-template-columns:1fr}.event-meta{grid-template-columns:1fr}.mobile-bottom{left:6px;right:6px}.mobile-bottom small{font-size:8px}}
+
+/* News editorial spacing */
+#news.grid{gap:22px}
+#news .card{display:flex;flex-direction:column;min-height:100%;background:linear-gradient(180deg,#111720 0%,#0d1219 100%)}
+#news .card img{aspect-ratio:16/8;object-fit:cover}
+#news .body{display:flex;flex-direction:column;flex:1;padding:22px 22px 20px}
+#news .meta{align-items:flex-start;line-height:1.35;margin-bottom:10px}
+#news .meta>span{display:flex;align-items:center;min-width:0}
+#news .meta time{flex:0 0 auto;padding-top:4px;color:#8f9aa7;font-weight:700}
+#news .source{font-size:11px;line-height:1.45;margin:0 0 12px;color:#8995a3}
+#news .tags{gap:7px;margin:0 0 14px}
+#news .tag{padding:5px 8px;font-size:9px;line-height:1.2}
+#news .card h3{font-size:20px;line-height:1.28;letter-spacing:-.01em;margin:0 0 12px}
+#news .card h3 a{display:block}
+#news .card p{font-size:14.5px;line-height:1.7;margin:0 0 18px;color:#aeb8c4;-webkit-line-clamp:4}
+#news .read{margin-top:auto;display:inline-flex;align-items:center;min-height:38px;font-size:13px;letter-spacing:.01em;color:#fff}
+#noticias .head{margin-bottom:28px}
+#noticias .head p{max-width:560px;line-height:1.5}
