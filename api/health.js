@@ -1,0 +1,1 @@
+export default function handler(req,res){res.setHeader('Cache-Control','no-store');res.status(200).json({ok:true,service:'Oscar Risan SimRacing',version:'production-ready-1',time:new Date().toISOString()})}
