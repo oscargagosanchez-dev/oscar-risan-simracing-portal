@@ -1,14 +1,4 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/news",
-      "destination": "https://oscar-risan-simracing-web-v7-l3ezrds1x.vercel.app/api/news"
-    },
-    {
-      "source": "/article.html",
-      "destination": "https://oscar-risan-simracing-web-v7-l3ezrds1x.vercel.app/article.html"
-    }
-  ],
   "headers": [
     {
       "source": "/img-(.*).js",
@@ -25,6 +15,15 @@
         {
           "key": "Cache-Control",
           "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/api/news",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=900, stale-while-revalidate=3600"
         }
       ]
     }
