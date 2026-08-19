@@ -1,0 +1,13 @@
+(()=>{
+const T=window.OR_TIMEZONE;if(!T)return;
+let events=[];
+const norm=s=>String(s||'').trim().toLowerCase();
+function findEvent(title,track){const nt=norm(title),nk=norm(track);return events.find(e=>norm(e.title)===nt&&(!nk||norm(e.track)===nk))||events.find(e=>norm(e.title)===nt)}
+function enhanceControl(){const sec=document.querySelector('#eventos');if(!sec||sec.querySelector('#orTimezoneMain'))return;const holder=document.createElement('div');holder.innerHTML=T.selectorHTML('orTimezoneMain');const control=holder.firstElementChild;const anchor=sec.querySelector('#freshness')||sec.querySelector('#eventnav');if(anchor)anchor.before(control);else sec.prepend(control);T.bind(control.querySelector('select'),apply)}
+function applyCards(){document.querySelectorAll('#eventCards .event-card').forEach(card=>{const title=card.querySelector('.event-content h3')?.textContent,track=card.querySelector('.event-content p')?.textContent,e=findEvent(title,track),time=card.querySelector('.event-time');if(!e||!time||!T.exactEvent(e))return;time.innerHTML=`${T.formatTime(e.start)}<span class="tz-suffix">${T.label()}</span>`})}
+function applyAgenda(){document.querySelectorAll('#scheduleList .s-item').forEach(row=>{const title=row.querySelector('.s-main b')?.textContent,small=row.querySelector('.s-main small')?.textContent||'',e=events.find(x=>norm(x.title)===norm(title)&&(!x.track||small.toLowerCase().includes(String(x.track).toLowerCase())) )||events.find(x=>norm(x.title)===norm(title)),time=row.querySelector('.s-time');if(!e||!time||!T.exactEvent(e))return;time.innerHTML=`${T.formatTime(e.start)}<span class="tz-suffix">${T.label()}</span>`})}
+function applyModal(){const modal=document.querySelector('#eventModal');if(!modal?.classList.contains('open'))return;const title=document.querySelector('#modalTitle')?.textContent,track=document.querySelector('#modalTrack')?.textContent,e=findEvent(title,track);if(!e||!T.exactEvent(e))return;const boxes=[...modal.querySelectorAll('.detail-box')];const box=boxes.find(b=>norm(b.querySelector('small')?.textContent)==='hora');const b=box?.querySelector('b');if(b)b.innerHTML=`${T.formatTime(e.start)}<span class="tz-suffix">${T.label()}</span>`}
+function apply(){applyCards();applyAgenda();applyModal()}
+function watch(){['#eventCards','#scheduleList','#eventModal'].forEach(sel=>{const el=document.querySelector(sel);if(el)new MutationObserver(()=>queueMicrotask(apply)).observe(el,{childList:true,subtree:true,attributes:sel==='#eventModal',attributeFilter:sel==='#eventModal'?['class']:undefined})})}
+fetch('/api/events').then(r=>r.json()).then(d=>{events=d.items||[];enhanceControl();apply();watch()}).catch(()=>enhanceControl());
+})();
