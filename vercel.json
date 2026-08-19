@@ -11,7 +11,7 @@
   ],
   "headers": [
     {
-      "source": "/assets-(.*).js",
+      "source": "/img-(.*).js",
       "headers": [
         {
           "key": "Cache-Control",
