@@ -8,12 +8,13 @@
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/mobile.css">
 <link rel="stylesheet" href="/news-editorial.css">
+<link rel="stylesheet" href="/srp.css">
 <script src="/img-spa-lmp2-lmgt3.js"></script><script src="/img-spa-wet-multiclass.js"></script><script src="/img-lemans-hypercar-lmgt3.js"></script><script src="/img-monza-gt3.js"></script><script src="/img-nurburgring-dtm.js"></script><script src="/img-hockenheim-super-touring.js"></script><script src="/img-silverstone-roadster.js"></script><script src="/img-suzuka-gt.js"></script></head>
 <body>
-<header class="top"><a class="brand" href="#"><span class="mark">OR</span><span><b>OSCAR RISAN</b><small>SIMRACING</small></span></a><nav><a href="#eventos">Eventos</a><a href="#noticias">Noticias</a><a href="#canales">Canales</a><a href="#directo">Twitch</a><a href="#videos">YouTube</a><a href="#social">X</a></nav></header>
+<header class="top"><a class="brand" href="#"><span class="mark">OR</span><span><b>OSCAR RISAN</b><small>SIMRACING</small></span></a><nav><a href="#eventos">Eventos</a><a href="#srp">SRP</a><a href="#noticias">Noticias</a><a href="#canales">Canales</a><a href="#directo">Twitch</a><a href="#videos">YouTube</a><a href="#social">X</a></nav></header>
 <main>
 <section class="hero"><div><span class="ey">SIMRACING EN CASTELLANO</span><h1>El paddock digital del SimRacing.</h1><p>Noticias, hardware, directos, vídeos, competición y ahora también una agenda visual y unificada de qué se corre en cada simulador.</p></div><div class="hero-card"><span class="ey">LIVE HUB</span><h2>Oscar Risan</h2><p>LMU · RaceRoom · Assetto Corsa · AMS2 · ETS2 · ATS</p></div></section>
-<div class="ticker">LE MANS ULTIMATE · AUTOMOBILISTA 2 · ASSETTO CORSA EVO · ASSETTO CORSA RALLY · RACEROOM · ETS2 · ATS · HARDWARE</div>
+<div class="ticker">LE MANS ULTIMATE · AUTOMOBILISTA 2 · ASSETTO CORSA EVO · ASSETTO CORSA RALLY · RACEROOM · ETS2 · ATS · HARDWARE · SRP</div>
 <section id="eventos" class="sec event-hero">
   <div class="event-top"><div><span class="ey">EVENTOS OFICIALES Y COMBINACIONES</span><h2 style="margin:8px 0 0;font-size:42px">¿Dónde correr?</h2></div><div class="event-date" id="todayDate"></div></div>
   <div class="week-tabs" id="weekTabs"><button class="week-tab active" data-week="today">Hoy</button><button class="week-tab" data-week="current">Esta semana</button><button class="week-tab" data-week="next">Próxima semana</button></div>
@@ -25,17 +26,60 @@
     <div class="schedule-list" id="scheduleList"></div>
   </div>
 </section>
+
+<section id="srp" class="sec srp-section">
+  <div class="srp-hero">
+    <div class="srp-intro">
+      <span class="srp-kicker">SIMRACING-PRO</span>
+      <h2>SRP® · Precisión neumática para SimRacing.</h2>
+      <p>Un espacio propio dentro del portal para seguir el ecosistema de SimRacing-Pro: hardware, tecnología neumática, software, soporte y la actividad competitiva de SRP. La información de producto se mantiene resumida aquí y enlaza siempre con la web oficial para especificaciones y compra.</p>
+      <div class="srp-actions"><a class="srp-btn primary" href="https://simracing-pro.com/es/" target="_blank" rel="noopener">Visitar SimRacing-Pro ↗</a><a class="srp-btn secondary" href="https://simracing-pro.com/es/shop/" target="_blank" rel="noopener">Ver ecosistema SRP</a></div>
+    </div>
+    <div class="srp-signal">
+      <div class="srp-stat accent"><b>Neumático</b><small>Arquitectura de pedales y freno de mano SRP.</small></div>
+      <div class="srp-stat"><b>MySETUP</b><small>Calibración, perfiles y ajustes del ecosistema.</small></div>
+      <div class="srp-stat"><b>CNC</b><small>Hardware de alto rendimiento mecanizado en España.</small></div>
+      <div class="srp-stat"><b>SRP Racing</b><small>Eventos, competición y actividad de la marca.</small></div>
+    </div>
+  </div>
+
+  <div class="srp-subhead"><div><span class="ey">HARDWARE DESTACADO</span><h3>Ecosistema SRP</h3></div><p>Selección editorial · detalles completos en la web oficial</p></div>
+  <div class="srp-products">
+    <article class="srp-product"><span class="srp-code">SYS.ENTRY</span><span class="srp-type">GT · TOURING · RALLY</span><h4>GT-S</h4><p>La entrada compacta al sistema neumático SRP, enfocada a rigidez, precisión y un formato más accesible.</p><a class="srp-link" href="https://simracing-pro.com/es/product/srp-gt-s-pedals/" target="_blank" rel="noopener">Descubrir GT-S →</a></article>
+    <article class="srp-product"><span class="srp-code">SYS.PRO</span><span class="srp-type">GT3 · ENDURANCE · RALLY</span><h4>GT-R</h4><p>La plataforma multidisciplinar de SRP para conducción GT, resistencia y simulación de alto rendimiento.</p><a class="srp-link" href="https://simracing-pro.com/es/product/srp-gt-r-sim-racing-pedal/" target="_blank" rel="noopener">Descubrir GT-R →</a></article>
+    <article class="srp-product"><span class="srp-code">SYS.FORMULA</span><span class="srp-type">FORMULA · OPEN WHEEL</span><h4>Formula-R</h4><p>Geometría y respuesta orientadas a monoplazas, con una filosofía de frenada de alta presión y corto recorrido.</p><a class="srp-link" href="https://simracing-pro.com/es/brand/srp-pedals/" target="_blank" rel="noopener">Descubrir Formula-R →</a></article>
+    <article class="srp-product"><span class="srp-code">SYS.CONTROL</span><span class="srp-type">RALLY · DRIFT</span><h4>SRP HB</h4><p>Freno de mano neumático para controlar la rotación del coche con una respuesta progresiva en rally y drift.</p><a class="srp-link" href="https://simracing-pro.com/es/product/srp-hb-handbrakes/" target="_blank" rel="noopener">Descubrir SRP HB →</a></article>
+  </div>
+
+  <div class="srp-lower">
+    <div class="srp-panel">
+      <div class="srp-panel-head"><h3>Actualidad SRP</h3><a href="https://simracing-pro.com/es/category/events/" target="_blank" rel="noopener">Ver eventos oficiales ↗</a></div>
+      <div class="srp-news" id="srpNews"><div class="empty">Cargando actualidad SRP…</div></div>
+    </div>
+    <div class="srp-panel">
+      <div class="srp-panel-head"><h3>Software & soporte</h3><a href="https://simracing-pro.com/es/downloads/" target="_blank" rel="noopener">Área oficial ↗</a></div>
+      <div class="srp-resources">
+        <a class="srp-resource" href="https://simracing-pro.com/es/downloads/" target="_blank" rel="noopener"><div><b>MySETUP y descargas</b><small>Software, firmware y manuales oficiales.</small></div><span>→</span></a>
+        <a class="srp-resource" href="https://simracing-pro.com/es/srp-faq/" target="_blank" rel="noopener"><div><b>FAQ y compatibilidad</b><small>Instalación, ajustes y dudas frecuentes.</small></div><span>→</span></a>
+        <a class="srp-resource" href="https://simracing-pro.com/es/accessories/" target="_blank" rel="noopener"><div><b>Accesorios y evoluciones</b><small>Upgrades, kits y ecosistema oficial.</small></div><span>→</span></a>
+      </div>
+      <div class="srp-note">SRP® y SimRacing-Pro son marcas de sus respectivos propietarios. Este apartado funciona como hub editorial dentro de Oscar Risan SimRacing y enlaza a las páginas oficiales.</div>
+    </div>
+  </div>
+</section>
+
 <section id="canales" class="sec"><div class="head"><div><span class="ey">MIS CANALES</span><h2>Entra con un clic</h2></div><p>Directos, vídeos y actualidad</p></div><div class="channels"><a class="channel" href="https://www.twitch.tv/oscarrisan" target="_blank"><span class="cm"><span class="ico">TW</span><span><b>Twitch</b><small>twitch.tv/oscarrisan</small></span></span><span>→</span></a><a class="channel" href="https://www.youtube.com/@oscarrisansimracing6480" target="_blank"><span class="cm"><span class="ico">YT</span><span><b>YouTube</b><small>Oscar Risan SimRacing</small></span></span><span>→</span></a><a class="channel" href="https://x.com/oscarrisan" target="_blank"><span class="cm"><span class="ico">X</span><span><b>X</b><small>@oscarrisan</small></span></span><span>→</span></a></div></section>
 <section id="noticias" class="sec"><div class="head"><div><span class="ey">PADDOCK NEWS</span><h2 id="newsTitle">Últimas noticias</h2></div><p>En castellano · fuentes oficiales y medios especializados</p></div><div id="news" class="grid"><div class="empty">Cargando noticias…</div></div></section>
 <section id="directo" class="sec"><div class="head"><div><span class="ey">TWITCH</span><h2>Oscar Risan en directo</h2></div><a href="https://www.twitch.tv/oscarrisan" target="_blank">Abrir Twitch →</a></div><div class="live"><iframe id="tp" allowfullscreen></iframe><iframe id="tc"></iframe></div></section>
 <section id="videos" class="sec"><div class="head"><div><span class="ey">YOUTUBE</span><h2>Últimos vídeos</h2></div><a href="https://www.youtube.com/@oscarrisansimracing6480" target="_blank">Abrir canal →</a></div><div id="yv" class="videos"><div class="empty">Cargando vídeos…</div></div></section>
 <section id="social" class="sec"><div class="head"><div><span class="ey">X</span><h2>@oscarrisan</h2></div><a href="https://x.com/oscarrisan" target="_blank">Abrir X →</a></div><a class="twitter-timeline" data-theme="dark" data-height="520" href="https://twitter.com/oscarrisan">Tweets de @oscarrisan</a></section>
 </main>
-<nav class="mobile-bottom" aria-label="Navegación móvil"><a href="#"><span>⌂</span><small>Inicio</small></a><a href="#eventos"><span>🏁</span><small>Carreras</small></a><a href="#noticias"><span>📰</span><small>Noticias</small></a><a href="#videos"><span>▶</span><small>Vídeos</small></a></nav>
+<nav class="mobile-bottom" aria-label="Navegación móvil"><a href="#"><span>⌂</span><small>Inicio</small></a><a href="#eventos"><span>🏁</span><small>Carreras</small></a><a href="#noticias"><span>📰</span><small>Noticias</small></a><a href="#srp"><span>SRP</span><small>SRP</small></a></nav>
 <div class="event-modal" id="eventModal" aria-hidden="true"><div class="event-dialog"><div class="modal-visual"><img id="modalEventImage" src="" alt=""></div><div class="event-dialog-head"><div><span class="ey" id="modalSim"></span><h2 id="modalTitle"></h2><div class="track" id="modalTrack"></div></div><button class="close-modal" id="closeEventModal" aria-label="Cerrar">×</button></div><div class="detail-tags" id="modalTags"></div><div class="detail-grid" id="modalDetails"></div><div class="detail-source" id="modalSource"></div></div></div>
-<footer><b>OSCAR RISAN SIMRACING</b><span>Twitch · YouTube · X · Noticias · Hardware · Eventos</span></footer>
+<footer><b>OSCAR RISAN SIMRACING</b><span>Twitch · YouTube · X · Noticias · Hardware · Eventos · SRP</span></footer>
 <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 <script src="/app.js" defer></script>
 <script src="/news-format.js" defer></script>
+<script src="/srp.js" defer></script>
 </body>
 </html>
