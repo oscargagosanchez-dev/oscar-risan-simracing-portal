@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Risan AutoClips</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0d0f14;--panel:#171a21;--panel2:#20242d;--txt:#f4f6fb;--muted:#9aa3b2;--accent:#9147ff;--ok:#24c76a;--warn:#ffb020;--bad:#ff5d5d}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#10131a,#0b0d12 55%);color:var(--txt);font-family:Inter,Segoe UI,Arial,sans-serif;min-height:100vh}
+    .wrap{max-width:920px;margin:0 auto;padding:28px 18px 60px}.hero{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+    h1{margin:0;font-size:34px;letter-spacing:-.04em}.sub{margin:8px 0 0;color:var(--muted);max-width:680px;line-height:1.5}.pill{padding:9px 12px;border:1px solid #343a46;border-radius:999px;color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.card{background:rgba(23,26,33,.96);border:1px solid #2b303b;border-radius:18px;padding:18px;box-shadow:0 16px 48px rgba(0,0,0,.18)}
+    .card h2{margin:0 0 14px;font-size:18px}.statusrow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.status{background:var(--panel2);border:1px solid #303641;border-radius:14px;padding:14px}.status b{display:block;font-size:14px;margin-bottom:6px}.status span{color:var(--muted);font-size:13px}
+    .ok{color:var(--ok)!important}.warn{color:var(--warn)!important}.bad{color:var(--bad)!important}
+    .meter{height:18px;background:#262b35;border-radius:999px;overflow:hidden;margin-top:10px}.meter>div{height:100%;width:0;background:linear-gradient(90deg,#4b7cff,#9147ff,#ff4d8d);transition:width .08s linear}.bigscore{font-size:42px;font-weight:800;letter-spacing:-.04em;margin:8px 0 0}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:12px;padding:12px 15px;font-weight:700;cursor:pointer;font-size:14px}.primary{background:var(--accent);color:white}.secondary{background:#2b303a;color:white;border:1px solid #3a414e}.danger{background:#3a2428;color:#ffd9df;border:1px solid #5d3038}button:disabled{opacity:.48;cursor:not-allowed}
+    label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}input[type=range]{width:100%}.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{background:#11141a;border:1px solid #313744;color:white;border-radius:10px;padding:10px 11px;width:100%;font-size:15px}
+    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}.log{height:190px;overflow:auto;background:#0f1217;border:1px solid #2a303a;border-radius:12px;padding:11px;font:12px/1.5 Consolas,monospace;color:#cfd6e4}.log div{margin-bottom:5px}
+    .clipbox{margin-top:12px;padding:12px;border-radius:12px;background:#11151b;border:1px solid #303744;display:none}.clipbox a{color:#c9a7ff}.tiny{font-size:12px;color:var(--muted)}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.statusrow{grid-template-columns:1fr}.row2{grid-template-columns:1fr}h1{font-size:29px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div><h1>Risan AutoClips</h1><p class="sub">Abres esta página cuando vayas a hacer directo. Detecta reacciones fuertes por el micrófono y solo crea clips cuando Twitch confirma que el canal está en directo.</p></div>
+    <div class="pill">Sin instalar nada en Windows</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="statusrow">
+      <div class="status"><b>Twitch</b><span id="twitchStatus">Pendiente de conectar</span></div>
+      <div class="status"><b>Directo</b><span id="liveStatus">Sin comprobar</span></div>
+      <div class="status"><b>AutoClips</b><span id="autoStatus">Detenido</span></div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="connectBtn">Conectar Twitch</button>
+      <button class="primary" id="startBtn" disabled>Activar AutoClips</button>
+      <button class="secondary" id="clipBtn" disabled>Crear clip ahora</button>
+      <button class="danger" id="disconnectBtn" disabled>Desconectar Twitch</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Detector de reacción</h2>
+      <div class="bigscore"><span id="score">0</span><span style="font-size:18px;color:var(--muted)"> /100</span></div>
+      <div class="meter"><div id="meterFill"></div></div>
+      <label>Sensibilidad: <b id="sensVal">72</b> <span class="tiny">(más alto = menos clips)</span></label>
+      <input id="sensitivity" type="range" min="45" max="95" value="72" />
+      <div class="row2">
+        <div><label>Duración del clip</label><select id="duration" class="field"><option>20</option><option selected>30</option><option>40</option><option>60</option></select></div>
+        <div><label>Separación mínima entre clips</label><select id="cooldown" class="field"><option>30</option><option selected>45</option><option>60</option><option>90</option></select></div>
+      </div>
+      <p class="hint">El audio se analiza localmente en tu navegador. No se graba ni se envía. La pestaña debe permanecer abierta mientras quieras usar AutoClips.</p>
+      <div class="clipbox" id="clipBox"><b>Último clip:</b> <span id="clipText"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>Actividad</h2>
+      <div class="log" id="log"></div>
+      <p class="hint">AutoClips comprueba periódicamente si <b>oscarrisan</b> está en directo. Fuera de directo no crea clips automáticos.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CLIENT_ID = 'gxyicr791zdn2la09i9kq3529rpre7';
+  const CHANNEL = 'oscarrisan';
+  const REDIRECT_URI = location.origin + location.pathname;
+  const SCOPES = 'clips:edit';
+  const els = Object.fromEntries([...document.querySelectorAll('[id]')].map(e=>[e.id,e]));
+  let token = localStorage.getItem('risan_twitch_token') || '';
+  let broadcasterId = localStorage.getItem('risan_broadcaster_id') || '';
+  let analyser, audioCtx, micStream, rafId;
+  let running = false, live = false, hotFrames = 0, lastClipAt = 0, liveTimer;
+  let baseline = 0.018;
+
+  const log = (m) => { const d=document.createElement('div'); d.textContent=`[${new Date().toLocaleTimeString()}] ${m}`; els.log.appendChild(d); els.log.scrollTop=els.log.scrollHeight; };
+  const setStatus=(el,text,cls='')=>{el.textContent=text;el.className=cls};
+  function savePrefs(){localStorage.setItem('risan_sens',els.sensitivity.value);localStorage.setItem('risan_dur',els.duration.value);localStorage.setItem('risan_cd',els.cooldown.value)}
+  function loadPrefs(){els.sensitivity.value=localStorage.getItem('risan_sens')||'72';els.duration.value=localStorage.getItem('risan_dur')||'30';els.cooldown.value=localStorage.getItem('risan_cd')||'45';els.sensVal.textContent=els.sensitivity.value}
+
+  async function validateToken(){
+    if(!token) return false;
+    try{
+      const r=await fetch('https://id.twitch.tv/oauth2/validate',{headers:{Authorization:`OAuth ${token}`}});
+      if(!r.ok) throw 0;
+      const v=await r.json();
+      if(!v.scopes?.includes('clips:edit')) throw 0;
+      setStatus(els.twitchStatus,'Conectado ✓','ok'); els.startBtn.disabled=false; els.clipBtn.disabled=false; els.disconnectBtn.disabled=false; els.connectBtn.disabled=true;
+      if(!broadcasterId){await resolveBroadcaster()}
+      await checkLive(); return true;
+    }catch{token='';broadcasterId='';localStorage.removeItem('risan_twitch_token');localStorage.removeItem('risan_broadcaster_id');setStatus(els.twitchStatus,'Pendiente de conectar','warn');return false}
+  }
+
+  async function resolveBroadcaster(){
+    const r=await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(CHANNEL)}`,{headers:{'Client-Id':CLIENT_ID,Authorization:`Bearer ${token}`}});
+    if(!r.ok) throw new Error('No puedo resolver el canal');
+    const j=await r.json(); if(!j.data?.[0]) throw new Error('Canal no encontrado');
+    broadcasterId=j.data[0].id; localStorage.setItem('risan_broadcaster_id',broadcasterId); log(`Canal Twitch preparado: ${j.data[0].display_name}`);
+  }
+
+  async function checkLive(){
+    if(!token||!broadcasterId) return;
+    try{
+      const r=await fetch(`https://api.twitch.tv/helix/streams?user_id=${encodeURIComponent(broadcasterId)}`,{headers:{'Client-Id':CLIENT_ID,Authorization:`Bearer ${token}`}});
+      if(r.status===401){await validateToken();return}
+      const j=await r.json(); const was=live; live=!!j.data?.length;
+      setStatus(els.liveStatus,live?'EN DIRECTO ✓':'Fuera de directo',live?'ok':'warn');
+      if(live&&!was) log('Twitch detecta el directo. Clips automáticos habilitados.');
+      if(!live&&was) log('Directo finalizado. Clips automáticos pausados.');
+    }catch(e){setStatus(els.liveStatus,'Error al comprobar','bad');log('Error comprobando directo: '+e.message)}
+  }
+
+  function connectTwitch(){
+    const state=crypto.getRandomValues(new Uint32Array(4)).join('-'); localStorage.setItem('risan_oauth_state',state);
+    const u=new URL('https://id.twitch.tv/oauth2/authorize');
+    u.search=new URLSearchParams({response_type:'token',client_id:CLIENT_ID,redirect_uri:REDIRECT_URI,scope:SCOPES,state,force_verify:'true'}).toString();
+    location.href=u.toString();
+  }
+
+  function handleOAuthReturn(){
+    if(!location.hash.includes('access_token=')) return false;
+    const p=new URLSearchParams(location.hash.slice(1)); const expected=localStorage.getItem('risan_oauth_state');
+    if(!p.get('access_token')||!expected||p.get('state')!==expected){log('La autorización de Twitch no pudo validarse.');return false}
+    token=p.get('access_token'); localStorage.setItem('risan_twitch_token',token); localStorage.removeItem('risan_oauth_state'); history.replaceState({},'',location.pathname+location.search); log('Twitch autorizado.'); return true;
+  }
+
+  async function createClip(auto=false){
+    if(!token||!broadcasterId){log('Twitch no está conectado.');return}
+    await checkLive(); if(!live){log('No se crea clip: Twitch indica que el canal no está en directo.');return}
+    const duration=Number(els.duration.value); const title=auto?'🔥 Momento destacado | Risan AutoClips':'🔥 Clip manual | Risan AutoClips';
+    try{
+      els.clipBtn.disabled=true;
+      const qs=new URLSearchParams({broadcaster_id:broadcasterId,duration:String(duration),title});
+      const r=await fetch(`https://api.twitch.tv/helix/clips?${qs}`,{method:'POST',headers:{'Client-Id':CLIENT_ID,Authorization:`Bearer ${token}`}});
+      const j=await r.json(); if(!r.ok) throw new Error(j.message||`Twitch ${r.status}`);
+      const c=j.data?.[0]; if(!c?.id) throw new Error('Twitch no devolvió el clip');
+      const url=`https://clips.twitch.tv/${c.id}`; els.clipBox.style.display='block'; els.clipText.innerHTML=`<a href="${url}" target="_blank" rel="noopener">${c.id}</a>`; log(`${auto?'✅ Clip automático':'✅ Clip manual'} creado: ${c.id}`);
+    }catch(e){log('Error creando clip: '+e.message)}finally{els.clipBtn.disabled=false}
+  }
+
+  async function startAuto(){
+    if(running){stopAuto();return}
+    try{
+      micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)(); const src=audioCtx.createMediaStreamSource(micStream); analyser=audioCtx.createAnalyser(); analyser.fftSize=1024; analyser.smoothingTimeConstant=.18; src.connect(analyser);
+      running=true; els.startBtn.textContent='Detener AutoClips'; setStatus(els.autoStatus,'Activo — escuchando','ok'); log('Micrófono activado. AutoClips está listo.'); tick();
+    }catch(e){log('No se pudo abrir el micrófono: '+e.message); setStatus(els.autoStatus,'Sin permiso de micrófono','bad')}
+  }
+  function stopAuto(){running=false;cancelAnimationFrame(rafId);if(micStream)micStream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();els.startBtn.textContent='Activar AutoClips';setStatus(els.autoStatus,'Detenido','warn');els.meterFill.style.width='0%';els.score.textContent='0';log('AutoClips detenido.');}
+
+  function tick(){
+    if(!running)return; const a=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(a); let s=0,peak=0; for(const v of a){s+=v*v;peak=Math.max(peak,Math.abs(v))} const rms=Math.sqrt(s/a.length);
+    if(rms<Math.max(baseline*1.8,.07)) baseline=.992*baseline+.008*Math.max(rms,.003);
+    const ratio=rms/Math.max(baseline,.006); let score=Math.round(Math.max(0,Math.min(100,(ratio-1)*25+peak*42)));
+    els.score.textContent=score;els.meterFill.style.width=score+'%'; const th=Number(els.sensitivity.value);
+    if(score>=th) hotFrames++; else hotFrames=Math.max(0,hotFrames-1);
+    if(hotFrames>=12){hotFrames=0; const now=Date.now(),cd=Number(els.cooldown.value)*1000; if(now-lastClipAt>=cd&&live){lastClipAt=now;log(`🔥 Reacción fuerte detectada (${score}/100).`);createClip(true)}}
+    rafId=requestAnimationFrame(tick);
+  }
+
+  els.connectBtn.addEventListener('click',connectTwitch); els.startBtn.addEventListener('click',startAuto); els.clipBtn.addEventListener('click',()=>createClip(false));
+  els.disconnectBtn.addEventListener('click',()=>{stopAuto();token='';broadcasterId='';localStorage.removeItem('risan_twitch_token');localStorage.removeItem('risan_broadcaster_id');setStatus(els.twitchStatus,'Desconectado','warn');els.connectBtn.disabled=false;els.startBtn.disabled=true;els.clipBtn.disabled=true;els.disconnectBtn.disabled=true;log('Twitch desconectado.');});
+  els.sensitivity.addEventListener('input',()=>{els.sensVal.textContent=els.sensitivity.value;savePrefs()});els.duration.addEventListener('change',savePrefs);els.cooldown.addEventListener('change',savePrefs);
+  loadPrefs(); handleOAuthReturn(); validateToken(); liveTimer=setInterval(checkLive,15000); log('Risan AutoClips listo.');
+})();
+</script>
+</body>
+</html>
