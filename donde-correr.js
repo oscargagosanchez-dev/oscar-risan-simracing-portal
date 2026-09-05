@@ -43,6 +43,12 @@
     const z=currentZone();if(z)opts.timeZone=z;
     return `${new Intl.DateTimeFormat('es-ES',opts).format(new Date(e.start))} <small style="opacity:.65">${esc(zoneLabel())}</small>`;
   }
+  function endDate(e){const s=new Date(e.start);if(e.end&&Number.isFinite(new Date(e.end).getTime()))return new Date(e.end);const mins=Number(e.durationMin)||60;return new Date(s.getTime()+mins*60000)}
+  const gDate=d=>new Date(d).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
+  function googleUrl(e){const start=new Date(e.start),end=endDate(e),p=new URLSearchParams({action:'TEMPLATE',text:e.title||'Evento SimRacing',dates:`${gDate(start)}/${gDate(end)}`,details:`${e.sim||e.label||'SimRacing'} · ${e.duration||''}\nFuente: ${e.source||'Oscar Risan SimRacing'}`,location:e.track||''});return `https://calendar.google.com/calendar/render?${p.toString()}`}
+  function calendarActions(e){if(!hasExactTime(e))return '<div class="calendar-note">Calendario disponible cuando haya hora exacta.</div>';return `<div class="calendar-actions"><a href="${esc(googleUrl(e))}" target="_blank" rel="noopener">Google Calendar</a><button type="button" data-ics="${esc(e.id)}">Apple / Outlook (.ics)</button></div>`}
+  function icsText(e){const start=new Date(e.start),end=endDate(e),stamp=gDate(new Date());const clean=s=>String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Oscar Risan SimRacing//Agenda+//ES','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${clean(e.id||gDate(start))}@oscarrisan-simracing`,`DTSTAMP:${stamp}`,`DTSTART:${gDate(start)}`,`DTEND:${gDate(end)}`,`SUMMARY:${clean(e.title||'Evento SimRacing')}`,`LOCATION:${clean(e.track||'')}`,`DESCRIPTION:${clean([e.sim||e.label,e.duration,e.source].filter(Boolean).join(' · '))}`,'END:VEVENT','END:VCALENDAR'].join('\r\n')}
+  function downloadIcs(e){const blob=new Blob([icsText(e)],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${String(e.title||'evento').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'evento'}.ics`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
   function match(e){
     if(mode==='all')return true;
     if(mode.startsWith('sim:'))return simKey(e.sim||e.label)===mode.slice(4);
@@ -50,7 +56,7 @@
     return (e.tags||[]).some(t=>norm(t)===norm(mode));
   }
   function card(e){
-    return `<article class="page-card"><span class="kicker">${esc(e.label||e.sim||'SIMRACING')} · ${esc(formatDate(e.start))}</span><h3>${esc(e.title)}</h3><p>${esc(e.track||'Circuito por confirmar')}</p><div class="facts"><span>🕒 ${formatTime(e)}</span><span>⏱ ${esc(e.duration||'No indicada')}</span><span>☁️ ${esc(e.weather||'No indicado')}</span><span>🏷 ${(e.tags||[]).map(esc).join(' · ')||esc(e.type||'Evento')}</span></div></article>`;
+    return `<article class="page-card"><span class="kicker">${esc(e.label||e.sim||'SIMRACING')} · ${esc(formatDate(e.start))}</span><h3>${esc(e.title)}</h3><p>${esc(e.track||'Circuito por confirmar')}</p><div class="facts"><span>🕒 ${formatTime(e)}</span><span>⏱ ${esc(e.duration||'No indicada')}</span><span>☁️ ${esc(e.weather||'No indicado')}</span><span>🏷 ${(e.tags||[]).map(esc).join(' · ')||esc(e.type||'Evento')}</span></div>${calendarActions(e)}</article>`;
   }
   function render(){
     const now=Date.now();
@@ -67,6 +73,7 @@
     mode=raw==='Le Mans Ultimate'?'sim:lmu':raw==='RaceRoom'?'sim:raceroom':raw==='Assetto Corsa EVO'?'sim:acevo':raw;
     render();
   });
+  document.querySelector('#fullEvents')?.addEventListener('click',ev=>{const b=ev.target.closest('button[data-ics]');if(!b)return;const e=items.find(x=>String(x.id)===String(b.dataset.ics));if(e)downloadIcs(e)});
   tzSelect?.addEventListener('change',()=>{
     timezone=['madrid','local','utc'].includes(tzSelect.value)?tzSelect.value:'madrid';
     try{localStorage.setItem(TZ_KEY,timezone)}catch{}
