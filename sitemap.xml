@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/donde-correr.html</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/buscar.html</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=Le%20Mans%20Ultimate</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=RaceRoom</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=Assetto%20Corsa%20EVO</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=Assetto%20Corsa%20Rally</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=Automobilista%202</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=Euro%20Truck%20Simulator%202</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=American%20Truck%20Simulator</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://oscar-risan-simracing-portal.vercel.app/simulador.html?sim=Hardware</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+</urlset>
