@@ -20,4 +20,5 @@
     if(image){upsert('meta[property="og:image"]',{property:'og:image',content:image});upsert('meta[name="twitter:image"]',{name:'twitter:image',content:image})}
   };
   window.OR_SEO={set};
+  if(!document.querySelector('script[src="/analytics.js"]')){const s=document.createElement('script');s.src='/analytics.js';s.defer=true;document.body.appendChild(s)}
 })();
