@@ -2,6 +2,7 @@ const SOURCES=[
   {appid:'2399420',category:'Le Mans Ultimate',label:'Le Mans Ultimate'},
   {appid:'211500',category:'RaceRoom',label:'RaceRoom'},
   {appid:'3058630',category:'Assetto Corsa EVO',label:'Assetto Corsa EVO'},
+  {appid:'3917090',category:'Assetto Corsa Rally',label:'Assetto Corsa Rally'},
   {appid:'1066890',category:'Automobilista 2',label:'Automobilista 2'},
   {appid:'227300',category:'Euro Truck Simulator 2',label:'Euro Truck Simulator 2'},
   {appid:'270880',category:'American Truck Simulator',label:'American Truck Simulator'}
@@ -30,7 +31,7 @@ async function translateItem(item){
  return {...item,title,summary,originalTitle,originalSummary,language:'es'};
 }
 async function getText(url,timeout=7000){const r=await fetch(url,{headers:UA,signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error(`${r.status} ${url}`);return await r.text()}
-async function steamNews(src){try{const u=`https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${src.appid}&count=8&maxlength=1200&format=json`;const r=await fetch(u,{headers:UA,signal:AbortSignal.timeout(7000)});if(!r.ok)throw new Error('steam');const j=await r.json();return (j?.appnews?.newsitems||[]).map(n=>({
+async function steamNews(src){try{const u=`https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${src.appid}&count=20&maxlength=1200&format=json`;const r=await fetch(u,{headers:UA,signal:AbortSignal.timeout(7000)});if(!r.ok)throw new Error('steam');const j=await r.json();return (j?.appnews?.newsitems||[]).map(n=>({
  id:`steam-${src.appid}-${n.gid}`,
  category:src.category,
  title:cleanHtml(n.title),
@@ -52,11 +53,11 @@ function categoryFromText(input=''){
  if(/euro truck simulator 2|\bets2\b/.test(t))return'Euro Truck Simulator 2';
  if(/american truck simulator|\bats\b/.test(t))return'American Truck Simulator';
  if(/hardware|equipment|wheel|wheelbase|pedal|cockpit|shifter|handbrake|dashboard|simucube|fanatec|moza|asetek|sim-lab|heusinkveld|conspit|simagic|thrustmaster/.test(t))return'Hardware';
- return'';
+ return'SimRacing';
 }
 async function traxionNews(){
  try{
-  const u='https://traxion.gg/wp-json/wp/v2/posts?per_page=14&_embed=1&_fields=id,date,link,title,excerpt,content,_embedded';
+  const u='https://traxion.gg/wp-json/wp/v2/posts?per_page=40&_embed=1&_fields=id,date,link,title,excerpt,content,_embedded';
   const r=await fetch(u,{headers:UA,signal:AbortSignal.timeout(7500)});
   if(!r.ok)throw new Error('traxion-wp');
   const posts=await r.json();
@@ -69,13 +70,13 @@ async function traxionNews(){
    const media=p?._embedded?.['wp:featuredmedia']?.[0];
    const image=media?.source_url||media?.media_details?.sizes?.large?.source_url||imageFrom(p?.content?.rendered||'');
    return {id:`traxion-${p.id}`,category,title,summary:excerpt,source:'Traxion',sourceUrl:p.link||'https://traxion.gg/category/news/',image,date:p.date?new Date(p.date).toISOString():new Date().toISOString(),tags:tagsFor(category,title),sourcePriority:2};
-  }).filter(x=>x.category&&x.title&&x.sourceUrl);
+  }).filter(x=>x.title&&x.sourceUrl);
  }catch{
   try{
    const xml=await getText('https://traxion.gg/feed/',7500);const out=[];const blocks=xml.match(/<item>[\s\S]*?<\/item>/gi)||[];
-   for(const block of blocks.slice(0,14)){
+   for(const block of blocks.slice(0,40)){
     const grab=tag=>{const m=block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`,'i'));return m?cleanHtml(m[1].replace(/<!\[CDATA\[|\]\]>/g,'')):''};
-    const title=grab('title'),summary=grab('description').slice(0,520),link=grab('link'),category=categoryFromText(`${grab('category')} ${title} ${summary}`);if(!category||!title)continue;
+    const title=grab('title'),summary=grab('description').slice(0,520),link=grab('link'),category=categoryFromText(`${grab('category')} ${title} ${summary}`);if(!title)continue;
     const dateRaw=grab('pubDate');out.push({id:`traxion-feed-${Buffer.from(link||title).toString('base64url').slice(0,32)}`,category,title,summary,source:'Traxion',sourceUrl:link||'https://traxion.gg/category/news/',image:imageFrom(block),date:dateRaw?new Date(dateRaw).toISOString():new Date().toISOString(),tags:tagsFor(category,title),sourcePriority:2});
    }
    return out;
@@ -85,11 +86,11 @@ async function traxionNews(){
 function absoluteOvertake(href=''){if(!href)return'';if(/^https?:\/\//i.test(href))return href;return`https://www.overtake.gg${href.startsWith('/')?'':'/'}${href}`}
 async function overtakeNews(){
  try{
-  const html=await getText('https://www.overtake.gg/',8000),out=[],seen=new Set();
+  const html=await getText('https://www.overtake.gg/news/',8000),out=[],seen=new Set();
   const rx=/<a\b[^>]*href=["']([^"']*\/news\/[^"'#?]+\.[0-9]+\/?)["'][^>]*>([\s\S]*?)<\/a>/gi;let m;
-  while((m=rx.exec(html))&&out.length<16){
+  while((m=rx.exec(html))&&out.length<40){
    const url=absoluteOvertake(decodeHtml(m[1]));if(seen.has(url))continue;const title=cleanHtml(m[2]);if(title.length<20||/^(image|comments?|read more)$/i.test(title))continue;
-   const start=Math.max(0,m.index-900),end=Math.min(html.length,rx.lastIndex+1200),context=html.slice(start,end);const category=categoryFromText(context+' '+title);if(!category)continue;
+   const start=Math.max(0,m.index-900),end=Math.min(html.length,rx.lastIndex+1200),context=html.slice(start,end);const category=categoryFromText(context+' '+title);
    const dateMatch=context.match(/<time[^>]+datetime=["']([^"']+)["']/i);const metaDesc=context.match(/(?:article-body|message-body|contentRow-snippet|articlePreview-description)[^>]*>([\s\S]{20,900}?)<\//i);let summary=cleanHtml(metaDesc?.[1]||'');if(!summary){const text=cleanHtml(context);const pos=text.toLowerCase().indexOf(title.toLowerCase());summary=(pos>=0?text.slice(pos+title.length):text).replace(/^(today|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)[^A-Z]*/i,'').slice(0,520)}
    const image=imageFrom(context);seen.add(url);out.push({id:`overtake-${url.match(/\.(\d+)\/?$/)?.[1]||Buffer.from(url).toString('base64url').slice(0,24)}`,category,title,summary,source:'OverTake',sourceUrl:url,image,date:dateMatch?new Date(dateMatch[1]).toISOString():new Date().toISOString(),tags:tagsFor(category,title),sourcePriority:2});
   }
@@ -103,13 +104,13 @@ const FALLBACK=[
  {id:'fallback-lmu-v14',category:'Le Mans Ultimate',title:'Le Mans Ultimate V1.4 y sus últimos hotfixes',summary:'Le Mans Ultimate ha recibido la actualización V1.4 y posteriores correcciones centradas en online, cambios de piloto, físicas, Race Watch y el calendario WEC 2026.',source:'Le Mans Ultimate / Steam',sourceUrl:'https://steamcommunity.com/app/2399420/announcements/',image:'',date:'2026-07-30T10:00:00.000Z',tags:['LMU','ACTUALIZACIÓN'],language:'es'},
  {id:'fallback-acevo-08',category:'Assetto Corsa EVO',title:'Assetto Corsa EVO Early Access 0.8 disponible',summary:'Kunos continúa ampliando Assetto Corsa EVO con la versión Early Access 0.8 y nuevas mejoras para el simulador.',source:'Assetto Corsa',sourceUrl:'https://assettocorsa.gg/assetto-corsa-evo/',image:'',date:'2026-07-08T10:00:00.000Z',tags:['AC EVO','ACTUALIZACIÓN'],language:'es'}
 ];
-async function translateInBatches(items,batchSize=6){const out=[];for(let i=0;i<items.length;i+=batchSize){const batch=items.slice(i,i+batchSize);out.push(...await Promise.all(batch.map(translateItem)))}return out}
+async function translateInBatches(items,batchSize=8){const out=[];for(let i=0;i<items.length;i+=batchSize){const batch=items.slice(i,i+batchSize);out.push(...await Promise.all(batch.map(translateItem)))}return out}
 export default async function handler(req,res){
- res.setHeader('Cache-Control','s-maxage=900, stale-while-revalidate=3600');
+ res.setHeader('Cache-Control','s-maxage=600, stale-while-revalidate=1800');
  const settled=await Promise.all([...SOURCES.map(steamNews),traxionNews(),overtakeNews()]);
  const steam=settled.slice(0,SOURCES.length).flat(),traxion=settled[SOURCES.length]||[],overtake=settled[SOURCES.length+1]||[];
- let items=dedupe([...steam,...traxion,...overtake]).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,42);
+ let items=dedupe([...steam,...traxion,...overtake]).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,100);
  if(!items.length)return res.status(200).json({items:FALLBACK,updatedAt:new Date().toISOString(),sourceMode:'fallback',translated:true,sources:{steam:0,traxion:0,overtake:0}});
- items=await translateInBatches(items,6);
+ items=await translateInBatches(items,8);
  return res.status(200).json({items,updatedAt:new Date().toISOString(),sourceMode:'live',translated:true,sources:{steam:steam.length,traxion:traxion.length,overtake:overtake.length}});
 }
