@@ -1,5 +1,6 @@
 compact-v1
-uploaded_sorted_indices=0-12
+uploaded_sorted_indices=0-15
 total_chunks=94
 source=risan-simracing-tools-16.zip
 compact32_strategy=enabled
+strategy=png->webp quality80 method6; lmu previews resized 1280x720 Lanczos; text gzip+base64; chunks 8000
