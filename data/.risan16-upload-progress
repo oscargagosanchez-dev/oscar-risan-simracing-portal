@@ -1,4 +1,5 @@
 compact-v1
-uploaded_sorted_indices=0-10
+uploaded_sorted_indices=0-12
 total_chunks=94
 source=risan-simracing-tools-16.zip
+compact32_strategy=enabled
