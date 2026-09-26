@@ -3,14 +3,13 @@
 use std::{
     fs::OpenOptions,
     io::Write,
-    mem::size_of,
     ptr::read_unaligned,
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use windows_sys::Win32::{
-    Foundation::CloseHandle,
+    Foundation::{CloseHandle, HANDLE},
     System::Memory::{MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, FILE_MAP_READ},
 };
 
@@ -48,7 +47,7 @@ const WHEEL_STRIDE: usize = 260;
 const W_SURFACE_TYPE: usize = 176;
 
 struct Mapping {
-    handle: isize,
+    handle: HANDLE,
     ptr: *const u8,
 }
 
@@ -58,7 +57,7 @@ impl Mapping {
         wide.push(0);
         unsafe {
             let handle = OpenFileMappingW(FILE_MAP_READ, 0, wide.as_ptr());
-            if handle == 0 {
+            if handle.is_null() {
                 return None;
             }
             let view = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
