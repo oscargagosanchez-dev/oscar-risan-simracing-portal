@@ -1,0 +1,31 @@
+name: Build Risan Telemetry Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/risan-telemetry-bridge/**'
+      - '.github/workflows/build-risan-telemetry-bridge.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tools/risan-telemetry-bridge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build release
+        run: cargo build --release
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target\release\risan-telemetry-bridge.exe dist\RisanTelemetryBridge.exe
+          Copy-Item README.md dist\LEEME.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Risan-Telemetry-Bridge-v0.1
+          path: tools/risan-telemetry-bridge/dist/*
+          if-no-files-found: error
