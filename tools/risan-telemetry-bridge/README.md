@@ -1,21 +1,32 @@
-# Risan Telemetry Bridge v0.2
+# Risan Telemetry Bridge v0.3
 
 Diagnóstico ultraligero para Le Mans Ultimate. Lee la memoria compartida nativa `LMU_Data` y registra eventos útiles para Risan AutoClips.
 
-## Qué mejora respecto a v0.1
+## Cambio principal de v0.3
 
-- Hora local legible (`HH:MM:SS`).
-- Ignora gaps negativos/no válidos.
-- Un cambio de posición ya no se considera automáticamente adelantamiento.
-- `OVERTAKE_CONFIRMED` / `POSITION_LOSS_CONFIRMED` requieren:
-  - cambio de una sola posición,
-  - rival cercano antes del cambio,
-  - jugador fuera de boxes,
-  - mantener la nueva posición durante 2 segundos.
-- Cambios que no cumplen las condiciones quedan como `POSITION_CHANGE` y no serán highlight.
-- Contactos + salida + trompo se agrupan en un único `INCIDENT_LOW/MEDIUM/HIGH`.
-- `CLOSE_BATTLE` requiere 5 s de proximidad y tiene 20 s de cooldown.
-- Sin sleeps largos dentro de la detección: el muestreo sigue estable a 10 Hz.
+La confirmación de adelantamientos ya no depende del gap de telemetría.
+
+El Bridge guarda la **identidad real (mID) del rival que ocupa la posición inmediatamente delante o detrás**. Si la posición cambia una plaza, espera 2 segundos y comprueba si ese mismo rival intercambió realmente la posición con el jugador.
+
+Ejemplo:
+
+- Tú P5 / rival X P4
+- cambio de posición
+- tú P4 / el mismo rival X P5 durante 2 s
+- resultado: `OVERTAKE_CONFIRMED`
+
+Para una pérdida de posición se aplica el mismo criterio a la inversa.
+
+## Protecciones contra falsos positivos
+
+- Saltos de más de una posición siguen como `POSITION_CHANGE`.
+- No confirma si el jugador está en boxes.
+- No confirma si el rival estaba o termina en boxes.
+- No confirma si el rival desaparece de la sesión.
+- La nueva posición debe mantenerse 2 segundos.
+- Los gaps negativos siguen descartados.
+- Los incidentes continúan agrupados como `INCIDENT_LOW/MEDIUM/HIGH`.
+- `CLOSE_BATTLE` sigue teniendo mínimo 5 s y cooldown de 20 s.
 
 ## Eventos
 
@@ -26,22 +37,14 @@ Diagnóstico ultraligero para Le Mans Ultimate. Lee la memoria compartida nativa
 - INCIDENT_LOW / INCIDENT_MEDIUM / INCIDENT_HIGH
 - RACE_FINISH
 
-## Requisitos LMU
-
-1. LMU -> Settings -> Gameplay.
-2. Activa **Enable Plugins**.
-3. Reinicia LMU completamente si acabas de cambiarlo.
-
 ## Uso
 
-1. Ejecuta `RisanTelemetryBridge.exe` en el PC donde corre LMU.
-2. Puedes abrirlo antes o después de LMU.
-3. Déjalo abierto durante una tanda normal.
-4. Al terminar, cierra con la X o Ctrl+C.
-5. Pasa `RisanTelemetryEvents.log` para revisar la prueba.
+1. LMU -> Settings -> Gameplay -> **Enable Plugins** activado.
+2. Ejecuta `RisanTelemetryBridge.exe` en el PC donde corre LMU.
+3. Haz una tanda normal.
+4. Cierra el Bridge al acabar.
+5. Pasa `RisanTelemetryEvents.log`.
 
-El bridge trabaja a 10 Hz, no usa GPU y no necesita Internet.
+Trabaja a 10 Hz, no usa GPU y no necesita Internet.
 
-## Importante
-
-v0.2 sigue siendo diagnóstica: todavía no crea clips. Primero validamos fiabilidad y consumo; después conectaremos estos eventos con AutoClips en el PC de streaming por red local.
+v0.3 sigue siendo diagnóstica. Cuando validemos los adelantamientos, el siguiente paso será enviar únicamente estos eventos por red local a AutoClips.
