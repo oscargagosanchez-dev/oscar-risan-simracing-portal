@@ -26,6 +26,8 @@ const OFF_NUM_VEHICLES: usize = OFF_SCORING_INFO + 104;
 const OFF_VEH_SCORING: usize = 2192;
 const SCORING_STRIDE: usize = 584;
 
+const SC_ID: usize = 0;
+const SC_DRIVER_NAME: usize = 4;
 const SC_TOTAL_LAPS: usize = 100;
 const SC_FINISH_STATUS: usize = 103;
 const SC_LAP_DIST: usize = 104;
@@ -50,12 +52,12 @@ const T_WHEELS: usize = 848;
 const WHEEL_STRIDE: usize = 260;
 const W_SURFACE_TYPE: usize = 176;
 
-const SAMPLE_PERIOD: Duration = Duration::from_millis(100); // 10 Hz
+const SAMPLE_PERIOD: Duration = Duration::from_millis(100);
 const POSITION_CONFIRM: Duration = Duration::from_secs(2);
 const BATTLE_MIN: Duration = Duration::from_secs(5);
 const BATTLE_COOLDOWN: Duration = Duration::from_secs(20);
 const INCIDENT_QUIET: Duration = Duration::from_secs(3);
-const ADJACENT_DISTANCE_M: f64 = 250.0;
+const ADJACENT_DISTANCE_M: f64 = 400.0;
 
 struct Mapping {
     handle: HANDLE,
@@ -84,6 +86,12 @@ impl Mapping {
     fn read<T: Copy>(&self, offset: usize) -> T {
         unsafe { read_unaligned(self.ptr.add(offset) as *const T) }
     }
+
+    fn read_name(&self, offset: usize, len: usize) -> String {
+        let bytes = unsafe { std::slice::from_raw_parts(self.ptr.add(offset), len) };
+        let end = bytes.iter().position(|&b| b == 0).unwrap_or(len);
+        String::from_utf8_lossy(&bytes[..end]).trim().to_string()
+    }
 }
 
 impl Drop for Mapping {
@@ -97,11 +105,20 @@ impl Drop for Mapping {
     }
 }
 
+#[derive(Clone)]
+struct RivalSnapshot {
+    id: i32,
+    name: String,
+    place: u8,
+    in_pits: bool,
+    distance: f64,
+}
+
 struct PendingPosition {
     old: u8,
     new: u8,
     started: Instant,
-    close_before: bool,
+    rival: RivalSnapshot,
     session: i32,
     lap_dist: f64,
 }
@@ -153,6 +170,8 @@ struct State {
     last_place: u8,
     last_finish: i8,
     last_impact_et: Option<f64>,
+    last_ahead: Option<RivalSnapshot>,
+    last_behind: Option<RivalSnapshot>,
     close_ahead_before: bool,
     close_behind_before: bool,
     pending_position: Option<PendingPosition>,
@@ -173,6 +192,8 @@ impl Default for State {
             last_place: 0,
             last_finish: 0,
             last_impact_et: None,
+            last_ahead: None,
+            last_behind: None,
             close_ahead_before: false,
             close_behind_before: false,
             pending_position: None,
@@ -197,7 +218,7 @@ fn now_string() -> String {
 }
 
 fn emit(log: &mut std::fs::File, kind: &str, details: &str) {
-    let line = format!("{} | {:<26} | {}\n", now_string(), kind, details);
+    let line = format!("{} | {:<28} | {}\n", now_string(), kind, details);
     print!("{line}");
     let _ = log.write_all(line.as_bytes());
     let _ = log.flush();
@@ -212,7 +233,6 @@ fn player_scoring_index(map: &Mapping, cached: Option<usize>) -> Option<usize> {
             }
         }
     }
-
     let n = map.read::<i32>(OFF_NUM_VEHICLES).clamp(0, MAX_VEHICLES as i32) as usize;
     (0..n).find(|&i| map.read::<u8>(OFF_VEH_SCORING + i * SCORING_STRIDE + SC_IS_PLAYER) != 0)
 }
@@ -224,8 +244,13 @@ fn find_place(map: &Mapping, place: u8) -> Option<usize> {
     let n = map.read::<i32>(OFF_NUM_VEHICLES).clamp(0, MAX_VEHICLES as i32) as usize;
     (0..n).find(|&i| {
         let base = OFF_VEH_SCORING + i * SCORING_STRIDE;
-        map.read::<u8>(base + SC_PLACE) == place && map.read::<u8>(base + SC_IN_PITS) == 0
+        map.read::<u8>(base + SC_PLACE) == place
     })
+}
+
+fn find_vehicle_id(map: &Mapping, id: i32) -> Option<usize> {
+    let n = map.read::<i32>(OFF_NUM_VEHICLES).clamp(0, MAX_VEHICLES as i32) as usize;
+    (0..n).find(|&i| map.read::<i32>(OFF_VEH_SCORING + i * SCORING_STRIDE + SC_ID) == id)
 }
 
 fn race_distance(map: &Mapping, scoring_idx: usize, lap_len: f64) -> f64 {
@@ -239,21 +264,28 @@ fn race_distance(map: &Mapping, scoring_idx: usize, lap_len: f64) -> f64 {
     }
 }
 
-fn adjacent_close(map: &Mapping, player_idx: usize, target_place: u8, lap_len: f64) -> bool {
-    let Some(other_idx) = find_place(map, target_place) else {
-        return false;
-    };
-    let p = race_distance(map, player_idx, lap_len);
-    let o = race_distance(map, other_idx, lap_len);
-    (p - o).abs() <= ADJACENT_DISTANCE_M
+fn rival_at_place(map: &Mapping, place: u8, player_idx: usize, lap_len: f64) -> Option<RivalSnapshot> {
+    let idx = find_place(map, place)?;
+    if idx == player_idx {
+        return None;
+    }
+    let base = OFF_VEH_SCORING + idx * SCORING_STRIDE;
+    let id = map.read::<i32>(base + SC_ID);
+    let name = map.read_name(base + SC_DRIVER_NAME, 32);
+    let in_pits = map.read::<u8>(base + SC_IN_PITS) != 0;
+    let player_distance = race_distance(map, player_idx, lap_len);
+    let rival_distance = race_distance(map, idx, lap_len);
+    Some(RivalSnapshot {
+        id,
+        name,
+        place,
+        in_pits,
+        distance: (player_distance - rival_distance).abs(),
+    })
 }
 
 fn valid_gap(g: f32) -> Option<f32> {
-    if g.is_finite() && g > 0.0 && g <= 20.0 {
-        Some(g)
-    } else {
-        None
-    }
+    if g.is_finite() && g > 0.0 && g <= 20.0 { Some(g) } else { None }
 }
 
 fn fmt_gap(g: Option<f32>) -> String {
@@ -268,13 +300,9 @@ fn maybe_flush_incident(st: &mut State, log: &mut std::fs::File) {
     let ready = st.incident.as_ref()
         .map(|i| i.last_signal.elapsed() >= INCIDENT_QUIET)
         .unwrap_or(false);
-
-    if !ready {
-        return;
-    }
+    if !ready { return; }
 
     if let Some(i) = st.incident.take() {
-        let duration = i.started.elapsed().as_secs_f32();
         emit(
             log,
             &format!("INCIDENT_{}", i.priority()),
@@ -286,7 +314,7 @@ fn maybe_flush_incident(st: &mut State, log: &mut std::fs::File) {
                 i.max_wheels_off,
                 if i.spin { "yes" } else { "no" },
                 i.max_speed_kmh,
-                duration
+                i.started.elapsed().as_secs_f32()
             ),
         );
     }
@@ -294,10 +322,10 @@ fn maybe_flush_incident(st: &mut State, log: &mut std::fs::File) {
 
 fn main() {
     println!("============================================");
-    println!("       RISAN TELEMETRY BRIDGE v0.2");
+    println!("       RISAN TELEMETRY BRIDGE v0.3");
     println!("============================================");
     println!("Diagnostico LMU: no crea clips todavia.");
-    println!("Confirmacion de adelantamientos + incidentes agrupados.");
+    println!("Adelantamientos por identidad real del rival.");
     println!("CPU objetivo: minimo | GPU: 0 | Internet: 0");
     println!("Log: RisanTelemetryEvents.log\n");
 
@@ -307,7 +335,7 @@ fn main() {
         .open("RisanTelemetryEvents.log")
         .expect("No se pudo abrir el log");
 
-    emit(&mut log, "BRIDGE_START", "v0.2 | Esperando LMU_Data");
+    emit(&mut log, "BRIDGE_START", "v0.3 | Esperando LMU_Data");
 
     loop {
         let Some(map) = Mapping::open() else {
@@ -326,7 +354,6 @@ fn main() {
             let active = map.read::<u8>(OFF_ACTIVE_VEHICLES) as usize;
             let has_player = map.read::<u8>(OFF_PLAYER_HAS_VEHICLE) != 0;
             let t_idx = map.read::<u8>(OFF_PLAYER_IDX) as usize;
-
             st.scoring_idx = player_scoring_index(&map, st.scoring_idx);
 
             if !has_player || t_idx >= MAX_VEHICLES || active == 0 {
@@ -356,36 +383,46 @@ fn main() {
             let path_lat = map.read::<f64>(sbase + SC_PATH_LATERAL);
             let track_edge = map.read::<f64>(sbase + SC_TRACK_EDGE);
 
-            // Confirm a position change only when it is one place, happened close to
-            // the adjacent rival, both cars are on track, and the new place survives 2 s.
             if st.last_place != 0 && place != 0 && place != st.last_place {
                 let delta = place as i16 - st.last_place as i16;
-                let close_before = if delta == -1 {
-                    st.close_ahead_before
+                let rival = if delta == -1 {
+                    st.last_ahead.clone()
                 } else if delta == 1 {
-                    st.close_behind_before
+                    st.last_behind.clone()
                 } else {
-                    false
+                    None
                 };
 
-                if delta.abs() == 1 && !in_pits && close_before {
-                    st.pending_position = Some(PendingPosition {
-                        old: st.last_place,
-                        new: place,
-                        started: Instant::now(),
-                        close_before,
-                        session,
-                        lap_dist,
-                    });
+                if delta.abs() == 1 && !in_pits {
+                    if let Some(rival) = rival {
+                        if !rival.in_pits {
+                            st.pending_position = Some(PendingPosition {
+                                old: st.last_place,
+                                new: place,
+                                started: Instant::now(),
+                                rival,
+                                session,
+                                lap_dist,
+                            });
+                        } else {
+                            emit(&mut log, "POSITION_CHANGE", &format!(
+                                "P{} -> P{} | rival={} in pits | no highlight",
+                                st.last_place, place, rival.name
+                            ));
+                            st.pending_position = None;
+                        }
+                    } else {
+                        emit(&mut log, "POSITION_CHANGE", &format!(
+                            "P{} -> P{} | rival identity unavailable | no highlight",
+                            st.last_place, place
+                        ));
+                        st.pending_position = None;
+                    }
                 } else {
-                    emit(
-                        &mut log,
-                        "POSITION_CHANGE",
-                        &format!(
-                            "P{} -> P{} | no highlight | delta={} | closeBefore={} | pits={}",
-                            st.last_place, place, delta, close_before, in_pits
-                        ),
-                    );
+                    emit(&mut log, "POSITION_CHANGE", &format!(
+                        "P{} -> P{} | delta={} | pits={} | no highlight",
+                        st.last_place, place, delta, in_pits
+                    ));
                     st.pending_position = None;
                 }
             }
@@ -395,20 +432,42 @@ fn main() {
                 if place != p.new {
                     st.pending_position = None;
                 } else if p.started.elapsed() >= POSITION_CONFIRM {
-                    let kind = if p.new < p.old {
-                        "OVERTAKE_CONFIRMED"
-                    } else {
-                        "POSITION_LOSS_CONFIRMED"
-                    };
-                    emit(
-                        &mut log,
-                        kind,
-                        &format!(
-                            "P{} -> P{} | stable=2s | closeBefore={} | lapDist={:.0}m | session={}",
-                            p.old, p.new, p.close_before, p.lap_dist, p.session
-                        ),
-                    );
-                    st.pending_position = None;
+                    let rival_now = find_vehicle_id(&map, p.rival.id).map(|idx| {
+                        let base = OFF_VEH_SCORING + idx * SCORING_STRIDE;
+                        (
+                            map.read::<u8>(base + SC_PLACE),
+                            map.read::<u8>(base + SC_IN_PITS) != 0,
+                        )
+                    });
+
+                    match rival_now {
+                        Some((rival_place, rival_in_pits)) if !rival_in_pits && rival_place == p.old => {
+                            let kind = if p.new < p.old {
+                                "OVERTAKE_CONFIRMED"
+                            } else {
+                                "POSITION_LOSS_CONFIRMED"
+                            };
+                            emit(&mut log, kind, &format!(
+                                "P{} -> P{} | rival={} (id={}) swapped to P{} | stable=2s | preDistance={:.0}m | lapDist={:.0}m | session={}",
+                                p.old, p.new, p.rival.name, p.rival.id, rival_place, p.rival.distance, p.lap_dist, p.session
+                            ));
+                            st.pending_position = None;
+                        }
+                        Some((rival_place, rival_in_pits)) => {
+                            emit(&mut log, "POSITION_CHANGE", &format!(
+                                "P{} -> P{} | rival={} now P{} pits={} | swap not confirmed",
+                                p.old, p.new, p.rival.name, rival_place, rival_in_pits
+                            ));
+                            st.pending_position = None;
+                        }
+                        None => {
+                            emit(&mut log, "POSITION_CHANGE", &format!(
+                                "P{} -> P{} | rival={} disappeared | no highlight",
+                                p.old, p.new, p.rival.name
+                            ));
+                            st.pending_position = None;
+                        }
+                    }
                 }
             }
 
@@ -440,9 +499,7 @@ fn main() {
             let mut bad_surface = 0usize;
             for wheel in 0..4 {
                 let surface = map.read::<u8>(tbase + T_WHEELS + wheel * WHEEL_STRIDE + W_SURFACE_TYPE);
-                if matches!(surface, 2 | 3 | 4) {
-                    bad_surface += 1;
-                }
+                if matches!(surface, 2 | 3 | 4) { bad_surface += 1; }
             }
 
             let offtrack = speed_kmh > 20.0
@@ -465,7 +522,6 @@ fn main() {
             let forward = vz.abs();
             let lateral = vx.abs();
             let possible_spin = speed_kmh > 45.0 && lateral > 6.0 && lateral > forward * 0.35;
-
             if possible_spin {
                 let since = st.spin_since.get_or_insert_with(Instant::now);
                 if !st.spin_active && since.elapsed() >= Duration::from_millis(550) {
@@ -484,11 +540,13 @@ fn main() {
             let gap_a = valid_gap(map.read::<f32>(tbase + T_GAP_AHEAD));
             let gap_b = valid_gap(map.read::<f32>(tbase + T_GAP_BEHIND));
 
-            let close_ahead_distance = place > 1 && adjacent_close(&map, s_idx, place - 1, lap_len);
-            let close_behind_distance = place < u8::MAX && adjacent_close(&map, s_idx, place.saturating_add(1), lap_len);
+            let current_ahead = if place > 1 { rival_at_place(&map, place - 1, s_idx, lap_len) } else { None };
+            let current_behind = rival_at_place(&map, place.saturating_add(1), s_idx, lap_len);
 
-            st.close_ahead_before = gap_a.map(|g| g <= 1.5).unwrap_or(false) || close_ahead_distance;
-            st.close_behind_before = gap_b.map(|g| g <= 1.5).unwrap_or(false) || close_behind_distance;
+            st.close_ahead_before = gap_a.map(|g| g <= 1.5).unwrap_or(false)
+                || current_ahead.as_ref().map(|r| r.distance <= ADJACENT_DISTANCE_M).unwrap_or(false);
+            st.close_behind_before = gap_b.map(|g| g <= 1.5).unwrap_or(false)
+                || current_behind.as_ref().map(|r| r.distance <= ADJACENT_DISTANCE_M).unwrap_or(false);
 
             let battle_close = !in_pits
                 && speed_kmh > 40.0
@@ -496,26 +554,15 @@ fn main() {
 
             if battle_close {
                 let since = st.battle_since.get_or_insert_with(Instant::now);
-                let cooldown_ok = st.last_battle_emit
-                    .map(|t| t.elapsed() >= BATTLE_COOLDOWN)
-                    .unwrap_or(true);
-
+                let cooldown_ok = st.last_battle_emit.map(|t| t.elapsed() >= BATTLE_COOLDOWN).unwrap_or(true);
                 if !st.battle_active && cooldown_ok && since.elapsed() >= BATTLE_MIN {
-                    emit(
-                        &mut log,
-                        "CLOSE_BATTLE",
-                        &format!(
-                            "ahead={} | behind={} | proximity={}{}",
-                            fmt_gap(gap_a),
-                            fmt_gap(gap_b),
-                            if st.close_ahead_before { "ahead" } else { "" },
-                            if st.close_behind_before {
-                                if st.close_ahead_before { "+behind" } else { "behind" }
-                            } else {
-                                ""
-                            }
-                        ),
-                    );
+                    emit(&mut log, "CLOSE_BATTLE", &format!(
+                        "ahead={} | behind={} | aheadRival={} | behindRival={}",
+                        fmt_gap(gap_a),
+                        fmt_gap(gap_b),
+                        current_ahead.as_ref().map(|r| r.name.as_str()).unwrap_or("n/a"),
+                        current_behind.as_ref().map(|r| r.name.as_str()).unwrap_or("n/a")
+                    ));
                     st.battle_active = true;
                     st.last_battle_emit = Some(Instant::now());
                 }
@@ -523,6 +570,11 @@ fn main() {
                 st.battle_since = None;
                 st.battle_active = false;
             }
+
+            // Store adjacent rival identities for the NEXT sample. A real pass is
+            // confirmed when one of these same IDs swaps places with the player.
+            st.last_ahead = current_ahead;
+            st.last_behind = current_behind;
 
             thread::sleep(SAMPLE_PERIOD);
         }
