@@ -1,27 +1,25 @@
-# Risan Telemetry Bridge v0.4
+# Risan Telemetry Bridge v0.5
 
 Diagnóstico ultraligero para Le Mans Ultimate. Lee la memoria compartida nativa `LMU_Data` y registra eventos útiles para Risan AutoClips.
 
-## Qué cambia en v0.4
+## Qué cambia en v0.5
 
-La v0.3 confirmó correctamente adelantamientos, pérdidas de posición e ignoró los cambios producidos en boxes. La v0.4 afina los incidentes para evitar clips por roces o golpes irrelevantes.
+La v0.4 ya filtraba correctamente contactos leves. En la última prueba apareció el mismo adelantamiento al mismo rival dos veces con pocos segundos de diferencia, así que v0.5 añade deduplicación específica de eventos de posición.
 
-### Filtro de contactos
+### Deduplicación de adelantamientos y pérdidas
 
-- Impactos inferiores a **80** se ignoran por completo como ruido/roce mínimo.
-- Un contacto aislado sin salida de pista ni trompo solo se considera highlight desde **500** de magnitud.
-- Los contactos menores de 500 quedan como `CONTACT_FILTERED` únicamente para diagnóstico y **no deben disparar AutoClips**.
-- Si existe salida de pista o trompo, el incidente sí se conserva aunque el impacto sea pequeño.
-- Impacto >= 2000, trompo o salida a alta velocidad siguen siendo `INCIDENT_HIGH`.
+- Si el mismo rival genera el mismo tipo de evento otra vez dentro de **8 segundos**, el segundo se marca como `POSITION_DUPLICATE_FILTERED`.
+- Ese evento duplicado queda solo en el log y **no será elegible para AutoClips**.
+- Un evento contrario sí se conserva. Ejemplo: adelantas a un rival y 4 s después él te vuelve a pasar; son dos acciones reales diferentes.
+- La confirmación por identidad real del rival y estabilidad de 2 s se mantiene.
 
-## Se mantiene
+## Filtro de contactos
 
-- `OVERTAKE_CONFIRMED` y `POSITION_LOSS_CONFIRMED` por intercambio de identidad real del rival.
-- Cambios en boxes excluidos de highlights.
-- Saltos múltiples de posición como `POSITION_CHANGE`.
-- Incidentes agrupados.
-- `CLOSE_BATTLE` con mínimo de 5 s y cooldown de 20 s.
-- 10 Hz, GPU 0, sin Internet.
+- Impactos inferiores a **80** se ignoran.
+- Contacto aislado sin salida/trompo solo es highlight desde **500**.
+- Contactos menores quedan como `CONTACT_FILTERED`.
+- Salida de pista o trompo conserva el incidente aunque el impacto sea menor.
+- Impactos >= 2000, trompo o salida rápida siguen siendo `INCIDENT_HIGH`.
 
 ## Eventos elegibles para futuros clips
 
@@ -32,7 +30,10 @@ La v0.3 confirmó correctamente adelantamientos, pérdidas de posición e ignor�
 - INCIDENT_HIGH
 - RACE_FINISH
 
-`POSITION_CHANGE` y `CONTACT_FILTERED` son diagnóstico y no serán triggers de clip.
+No elegibles:
+- POSITION_CHANGE
+- POSITION_DUPLICATE_FILTERED
+- CONTACT_FILTERED
 
 ## Uso
 
@@ -42,4 +43,6 @@ La v0.3 confirmó correctamente adelantamientos, pérdidas de posición e ignor�
 4. Cierra el Bridge al acabar.
 5. Pasa `RisanTelemetryEvents.log`.
 
-v0.4 sigue siendo diagnóstica. Si el filtrado queda bien, el siguiente paso es enviar solo los eventos elegibles por red local al AutoClips del PC de streaming.
+Sigue trabajando a 10 Hz, sin GPU y sin Internet.
+
+Si v0.5 valida la deduplicación, el siguiente paso es conectar estos eventos por red local con Risan AutoClips en el PC de streaming.
