@@ -5,12 +5,15 @@ use std::{
     io::Write,
     ptr::read_unaligned,
     thread,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, HANDLE},
-    System::Memory::{MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, FILE_MAP_READ},
+    Foundation::{CloseHandle, HANDLE, SYSTEMTIME},
+    System::{
+        Memory::{MapViewOfFile, OpenFileMappingW, UnmapViewOfFile, FILE_MAP_READ},
+        SystemInformation::GetLocalTime,
+    },
 };
 
 const MAP_NAME: &str = "LMU_Data";
@@ -18,10 +21,12 @@ const MAX_VEHICLES: usize = 104;
 
 const OFF_SCORING_INFO: usize = 1632;
 const OFF_SESSION: usize = OFF_SCORING_INFO + 64;
+const OFF_LAP_LENGTH: usize = OFF_SCORING_INFO + 88;
 const OFF_NUM_VEHICLES: usize = OFF_SCORING_INFO + 104;
 const OFF_VEH_SCORING: usize = 2192;
 const SCORING_STRIDE: usize = 584;
 
+const SC_TOTAL_LAPS: usize = 100;
 const SC_FINISH_STATUS: usize = 103;
 const SC_LAP_DIST: usize = 104;
 const SC_PATH_LATERAL: usize = 112;
@@ -36,7 +41,6 @@ const OFF_PLAYER_HAS_VEHICLE: usize = OFF_ACTIVE_VEHICLES + 2;
 const OFF_TELEM_INFO: usize = 128_468;
 const TELEMETRY_STRIDE: usize = 1888;
 
-const T_ELAPSED: usize = 12;
 const T_LOCAL_VEL: usize = 184;
 const T_LAST_IMPACT_ET: usize = 552;
 const T_LAST_IMPACT_MAG: usize = 560;
@@ -45,6 +49,13 @@ const T_GAP_BEHIND: usize = 784;
 const T_WHEELS: usize = 848;
 const WHEEL_STRIDE: usize = 260;
 const W_SURFACE_TYPE: usize = 176;
+
+const SAMPLE_PERIOD: Duration = Duration::from_millis(100); // 10 Hz
+const POSITION_CONFIRM: Duration = Duration::from_secs(2);
+const BATTLE_MIN: Duration = Duration::from_secs(5);
+const BATTLE_COOLDOWN: Duration = Duration::from_secs(20);
+const INCIDENT_QUIET: Duration = Duration::from_secs(3);
+const ADJACENT_DISTANCE_M: f64 = 250.0;
 
 struct Mapping {
     handle: HANDLE,
@@ -86,25 +97,107 @@ impl Drop for Mapping {
     }
 }
 
-#[derive(Default)]
+struct PendingPosition {
+    old: u8,
+    new: u8,
+    started: Instant,
+    close_before: bool,
+    session: i32,
+    lap_dist: f64,
+}
+
+struct Incident {
+    started: Instant,
+    last_signal: Instant,
+    contacts: u32,
+    max_impact: f64,
+    offtrack: bool,
+    max_wheels_off: usize,
+    spin: bool,
+    max_speed_kmh: f64,
+}
+
+impl Incident {
+    fn new() -> Self {
+        let now = Instant::now();
+        Self {
+            started: now,
+            last_signal: now,
+            contacts: 0,
+            max_impact: 0.0,
+            offtrack: false,
+            max_wheels_off: 0,
+            spin: false,
+            max_speed_kmh: 0.0,
+        }
+    }
+
+    fn touch(&mut self, speed_kmh: f64) {
+        self.last_signal = Instant::now();
+        self.max_speed_kmh = self.max_speed_kmh.max(speed_kmh);
+    }
+
+    fn priority(&self) -> &'static str {
+        if self.spin || self.max_impact >= 2000.0 || (self.offtrack && self.max_speed_kmh >= 180.0) {
+            "HIGH"
+        } else if self.contacts > 0 || self.offtrack {
+            "MEDIUM"
+        } else {
+            "LOW"
+        }
+    }
+}
+
 struct State {
     scoring_idx: Option<usize>,
     last_place: u8,
     last_finish: i8,
-    last_impact_et: f64,
+    last_impact_et: Option<f64>,
+    close_ahead_before: bool,
+    close_behind_before: bool,
+    pending_position: Option<PendingPosition>,
     offtrack_since: Option<Instant>,
+    offtrack_active: bool,
     spin_since: Option<Instant>,
+    spin_active: bool,
     battle_since: Option<Instant>,
     battle_active: bool,
+    last_battle_emit: Option<Instant>,
+    incident: Option<Incident>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            scoring_idx: None,
+            last_place: 0,
+            last_finish: 0,
+            last_impact_et: None,
+            close_ahead_before: false,
+            close_behind_before: false,
+            pending_position: None,
+            offtrack_since: None,
+            offtrack_active: false,
+            spin_since: None,
+            spin_active: false,
+            battle_since: None,
+            battle_active: false,
+            last_battle_emit: None,
+            incident: None,
+        }
+    }
 }
 
 fn now_string() -> String {
-    let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-    secs.to_string()
+    unsafe {
+        let mut t: SYSTEMTIME = std::mem::zeroed();
+        GetLocalTime(&mut t);
+        format!("{:02}:{:02}:{:02}", t.wHour, t.wMinute, t.wSecond)
+    }
 }
 
 fn emit(log: &mut std::fs::File, kind: &str, details: &str) {
-    let line = format!("{} | {:<20} | {}\n", now_string(), kind, details);
+    let line = format!("{} | {:<26} | {}\n", now_string(), kind, details);
     print!("{line}");
     let _ = log.write_all(line.as_bytes());
     let _ = log.flush();
@@ -119,15 +212,92 @@ fn player_scoring_index(map: &Mapping, cached: Option<usize>) -> Option<usize> {
             }
         }
     }
+
     let n = map.read::<i32>(OFF_NUM_VEHICLES).clamp(0, MAX_VEHICLES as i32) as usize;
     (0..n).find(|&i| map.read::<u8>(OFF_VEH_SCORING + i * SCORING_STRIDE + SC_IS_PLAYER) != 0)
 }
 
+fn find_place(map: &Mapping, place: u8) -> Option<usize> {
+    if place == 0 {
+        return None;
+    }
+    let n = map.read::<i32>(OFF_NUM_VEHICLES).clamp(0, MAX_VEHICLES as i32) as usize;
+    (0..n).find(|&i| {
+        let base = OFF_VEH_SCORING + i * SCORING_STRIDE;
+        map.read::<u8>(base + SC_PLACE) == place && map.read::<u8>(base + SC_IN_PITS) == 0
+    })
+}
+
+fn race_distance(map: &Mapping, scoring_idx: usize, lap_len: f64) -> f64 {
+    let base = OFF_VEH_SCORING + scoring_idx * SCORING_STRIDE;
+    let laps = map.read::<i16>(base + SC_TOTAL_LAPS).max(0) as f64;
+    let dist = map.read::<f64>(base + SC_LAP_DIST);
+    if lap_len.is_finite() && lap_len > 100.0 {
+        laps * lap_len + dist
+    } else {
+        dist
+    }
+}
+
+fn adjacent_close(map: &Mapping, player_idx: usize, target_place: u8, lap_len: f64) -> bool {
+    let Some(other_idx) = find_place(map, target_place) else {
+        return false;
+    };
+    let p = race_distance(map, player_idx, lap_len);
+    let o = race_distance(map, other_idx, lap_len);
+    (p - o).abs() <= ADJACENT_DISTANCE_M
+}
+
+fn valid_gap(g: f32) -> Option<f32> {
+    if g.is_finite() && g > 0.0 && g <= 20.0 {
+        Some(g)
+    } else {
+        None
+    }
+}
+
+fn fmt_gap(g: Option<f32>) -> String {
+    g.map(|v| format!("{v:.2}s")).unwrap_or_else(|| "n/a".to_string())
+}
+
+fn incident_mut(st: &mut State) -> &mut Incident {
+    st.incident.get_or_insert_with(Incident::new)
+}
+
+fn maybe_flush_incident(st: &mut State, log: &mut std::fs::File) {
+    let ready = st.incident.as_ref()
+        .map(|i| i.last_signal.elapsed() >= INCIDENT_QUIET)
+        .unwrap_or(false);
+
+    if !ready {
+        return;
+    }
+
+    if let Some(i) = st.incident.take() {
+        let duration = i.started.elapsed().as_secs_f32();
+        emit(
+            log,
+            &format!("INCIDENT_{}", i.priority()),
+            &format!(
+                "contacts={} | maxImpact={:.0} | offTrack={} | wheelsOff={} | spin={} | maxSpeed={:.0}km/h | {:.1}s",
+                i.contacts,
+                i.max_impact,
+                if i.offtrack { "yes" } else { "no" },
+                i.max_wheels_off,
+                if i.spin { "yes" } else { "no" },
+                i.max_speed_kmh,
+                duration
+            ),
+        );
+    }
+}
+
 fn main() {
     println!("============================================");
-    println!("       RISAN TELEMETRY BRIDGE v0.1");
+    println!("       RISAN TELEMETRY BRIDGE v0.2");
     println!("============================================");
     println!("Diagnostico LMU: no crea clips todavia.");
+    println!("Confirmacion de adelantamientos + incidentes agrupados.");
     println!("CPU objetivo: minimo | GPU: 0 | Internet: 0");
     println!("Log: RisanTelemetryEvents.log\n");
 
@@ -137,7 +307,7 @@ fn main() {
         .open("RisanTelemetryEvents.log")
         .expect("No se pudo abrir el log");
 
-    emit(&mut log, "BRIDGE_START", "Esperando LMU_Data");
+    emit(&mut log, "BRIDGE_START", "v0.2 | Esperando LMU_Data");
 
     loop {
         let Some(map) = Mapping::open() else {
@@ -153,7 +323,6 @@ fn main() {
         let mut st = State::default();
 
         loop {
-            // If LMU closes, the existing mapping can remain valid briefly. We verify basic counts.
             let active = map.read::<u8>(OFF_ACTIVE_VEHICLES) as usize;
             let has_player = map.read::<u8>(OFF_PLAYER_HAS_VEHICLE) != 0;
             let t_idx = map.read::<u8>(OFF_PLAYER_IDX) as usize;
@@ -161,8 +330,8 @@ fn main() {
             st.scoring_idx = player_scoring_index(&map, st.scoring_idx);
 
             if !has_player || t_idx >= MAX_VEHICLES || active == 0 {
+                maybe_flush_incident(&mut st, &mut log);
                 thread::sleep(Duration::from_millis(500));
-                // Re-open check catches game shutdown without busy looping.
                 if Mapping::open().is_none() {
                     emit(&mut log, "LMU_DISCONNECTED", "Esperando siguiente sesion");
                     break;
@@ -179,6 +348,7 @@ fn main() {
             let tbase = OFF_TELEM_INFO + t_idx * TELEMETRY_STRIDE;
 
             let session = map.read::<i32>(OFF_SESSION);
+            let lap_len = map.read::<f64>(OFF_LAP_LENGTH);
             let place = map.read::<u8>(sbase + SC_PLACE);
             let finish = map.read::<i8>(sbase + SC_FINISH_STATUS);
             let in_pits = map.read::<u8>(sbase + SC_IN_PITS) != 0;
@@ -186,32 +356,86 @@ fn main() {
             let path_lat = map.read::<f64>(sbase + SC_PATH_LATERAL);
             let track_edge = map.read::<f64>(sbase + SC_TRACK_EDGE);
 
-            if st.last_place != 0 && place != 0 && place != st.last_place && !in_pits {
-                if place < st.last_place {
-                    emit(&mut log, "OVERTAKE", &format!("P{} -> P{} | lapDist={:.0}m | session={}", st.last_place, place, lap_dist, session));
+            // Confirm a position change only when it is one place, happened close to
+            // the adjacent rival, both cars are on track, and the new place survives 2 s.
+            if st.last_place != 0 && place != 0 && place != st.last_place {
+                let delta = place as i16 - st.last_place as i16;
+                let close_before = if delta == -1 {
+                    st.close_ahead_before
+                } else if delta == 1 {
+                    st.close_behind_before
                 } else {
-                    emit(&mut log, "POSITION_LOSS", &format!("P{} -> P{} | lapDist={:.0}m | session={}", st.last_place, place, lap_dist, session));
+                    false
+                };
+
+                if delta.abs() == 1 && !in_pits && close_before {
+                    st.pending_position = Some(PendingPosition {
+                        old: st.last_place,
+                        new: place,
+                        started: Instant::now(),
+                        close_before,
+                        session,
+                        lap_dist,
+                    });
+                } else {
+                    emit(
+                        &mut log,
+                        "POSITION_CHANGE",
+                        &format!(
+                            "P{} -> P{} | no highlight | delta={} | closeBefore={} | pits={}",
+                            st.last_place, place, delta, close_before, in_pits
+                        ),
+                    );
+                    st.pending_position = None;
                 }
             }
             st.last_place = place;
+
+            if let Some(p) = &st.pending_position {
+                if place != p.new {
+                    st.pending_position = None;
+                } else if p.started.elapsed() >= POSITION_CONFIRM {
+                    let kind = if p.new < p.old {
+                        "OVERTAKE_CONFIRMED"
+                    } else {
+                        "POSITION_LOSS_CONFIRMED"
+                    };
+                    emit(
+                        &mut log,
+                        kind,
+                        &format!(
+                            "P{} -> P{} | stable=2s | closeBefore={} | lapDist={:.0}m | session={}",
+                            p.old, p.new, p.close_before, p.lap_dist, p.session
+                        ),
+                    );
+                    st.pending_position = None;
+                }
+            }
 
             if finish == 1 && st.last_finish != 1 {
                 emit(&mut log, "RACE_FINISH", &format!("Final P{} | session={}", place, session));
             }
             st.last_finish = finish;
 
-            let impact_et = map.read::<f64>(tbase + T_LAST_IMPACT_ET);
-            let impact_mag = map.read::<f64>(tbase + T_LAST_IMPACT_MAG);
-            if impact_et.is_finite() && impact_et > 0.0 && impact_et > st.last_impact_et + 0.001 {
-                emit(&mut log, "CONTACT", &format!("magnitude={:.2} | ET={:.2}", impact_mag, impact_et));
-                st.last_impact_et = impact_et;
-            }
-
             let vx = map.read::<f64>(tbase + T_LOCAL_VEL);
             let vy = map.read::<f64>(tbase + T_LOCAL_VEL + 8);
             let vz = map.read::<f64>(tbase + T_LOCAL_VEL + 16);
-            let speed = (vx*vx + vy*vy + vz*vz).sqrt();
+            let speed = (vx * vx + vy * vy + vz * vz).sqrt();
             let speed_kmh = speed * 3.6;
+
+            let impact_et = map.read::<f64>(tbase + T_LAST_IMPACT_ET);
+            let impact_mag = map.read::<f64>(tbase + T_LAST_IMPACT_MAG);
+            match st.last_impact_et {
+                None => st.last_impact_et = Some(impact_et),
+                Some(prev) if impact_et.is_finite() && impact_et > 0.0 && impact_et > prev + 0.001 => {
+                    let inc = incident_mut(&mut st);
+                    inc.contacts += 1;
+                    inc.max_impact = inc.max_impact.max(impact_mag.max(0.0));
+                    inc.touch(speed_kmh);
+                    st.last_impact_et = Some(impact_et);
+                }
+                _ => {}
+            }
 
             let mut bad_surface = 0usize;
             for wheel in 0..4 {
@@ -221,51 +445,86 @@ fn main() {
                 }
             }
 
-            let offtrack = speed_kmh > 20.0 && (bad_surface >= 2 || (track_edge > 0.0 && path_lat.abs() > track_edge + 0.5));
+            let offtrack = speed_kmh > 20.0
+                && (bad_surface >= 2 || (track_edge > 0.0 && path_lat.abs() > track_edge + 0.5));
+
             if offtrack {
                 let since = st.offtrack_since.get_or_insert_with(Instant::now);
-                if since.elapsed() >= Duration::from_millis(450) {
-                    emit(&mut log, "OFF_TRACK", &format!("{} ruedas fuera | {:.0} km/h", bad_surface, speed_kmh));
-                    st.offtrack_since = None;
-                    thread::sleep(Duration::from_millis(900));
+                if !st.offtrack_active && since.elapsed() >= Duration::from_millis(450) {
+                    let inc = incident_mut(&mut st);
+                    inc.offtrack = true;
+                    inc.max_wheels_off = inc.max_wheels_off.max(bad_surface);
+                    inc.touch(speed_kmh);
+                    st.offtrack_active = true;
                 }
             } else {
                 st.offtrack_since = None;
+                st.offtrack_active = false;
             }
 
             let forward = vz.abs();
             let lateral = vx.abs();
             let possible_spin = speed_kmh > 45.0 && lateral > 6.0 && lateral > forward * 0.35;
+
             if possible_spin {
                 let since = st.spin_since.get_or_insert_with(Instant::now);
-                if since.elapsed() >= Duration::from_millis(550) {
-                    emit(&mut log, "POSSIBLE_SPIN", &format!("lateral={:.1} m/s | {:.0} km/h", lateral, speed_kmh));
-                    st.spin_since = None;
-                    thread::sleep(Duration::from_millis(1200));
+                if !st.spin_active && since.elapsed() >= Duration::from_millis(550) {
+                    let inc = incident_mut(&mut st);
+                    inc.spin = true;
+                    inc.touch(speed_kmh);
+                    st.spin_active = true;
                 }
             } else {
                 st.spin_since = None;
+                st.spin_active = false;
             }
 
-            let gap_a = map.read::<f32>(tbase + T_GAP_AHEAD);
-            let gap_b = map.read::<f32>(tbase + T_GAP_BEHIND);
-            let close = !in_pits && speed_kmh > 40.0 &&
-                ((gap_a.is_finite() && gap_a > 0.0 && gap_a <= 1.0) ||
-                 (gap_b.is_finite() && gap_b > 0.0 && gap_b <= 1.0));
+            maybe_flush_incident(&mut st, &mut log);
 
-            if close {
+            let gap_a = valid_gap(map.read::<f32>(tbase + T_GAP_AHEAD));
+            let gap_b = valid_gap(map.read::<f32>(tbase + T_GAP_BEHIND));
+
+            let close_ahead_distance = place > 1 && adjacent_close(&map, s_idx, place - 1, lap_len);
+            let close_behind_distance = place < u8::MAX && adjacent_close(&map, s_idx, place.saturating_add(1), lap_len);
+
+            st.close_ahead_before = gap_a.map(|g| g <= 1.5).unwrap_or(false) || close_ahead_distance;
+            st.close_behind_before = gap_b.map(|g| g <= 1.5).unwrap_or(false) || close_behind_distance;
+
+            let battle_close = !in_pits
+                && speed_kmh > 40.0
+                && (st.close_ahead_before || st.close_behind_before);
+
+            if battle_close {
                 let since = st.battle_since.get_or_insert_with(Instant::now);
-                if !st.battle_active && since.elapsed() >= Duration::from_secs(5) {
-                    emit(&mut log, "CLOSE_BATTLE", &format!("ahead={:.2}s | behind={:.2}s", gap_a, gap_b));
+                let cooldown_ok = st.last_battle_emit
+                    .map(|t| t.elapsed() >= BATTLE_COOLDOWN)
+                    .unwrap_or(true);
+
+                if !st.battle_active && cooldown_ok && since.elapsed() >= BATTLE_MIN {
+                    emit(
+                        &mut log,
+                        "CLOSE_BATTLE",
+                        &format!(
+                            "ahead={} | behind={} | proximity={}{}",
+                            fmt_gap(gap_a),
+                            fmt_gap(gap_b),
+                            if st.close_ahead_before { "ahead" } else { "" },
+                            if st.close_behind_before {
+                                if st.close_ahead_before { "+behind" } else { "behind" }
+                            } else {
+                                ""
+                            }
+                        ),
+                    );
                     st.battle_active = true;
+                    st.last_battle_emit = Some(Instant::now());
                 }
             } else {
                 st.battle_since = None;
                 st.battle_active = false;
             }
 
-            // 10 Hz is more than enough for highlight events and keeps load tiny.
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(SAMPLE_PERIOD);
         }
 
         thread::sleep(Duration::from_secs(1));
