@@ -58,6 +58,8 @@ const BATTLE_MIN: Duration = Duration::from_secs(5);
 const BATTLE_COOLDOWN: Duration = Duration::from_secs(20);
 const INCIDENT_QUIET: Duration = Duration::from_secs(3);
 const ADJACENT_DISTANCE_M: f64 = 400.0;
+const CONTACT_RECORD_MIN: f64 = 80.0;
+const CONTACT_HIGHLIGHT_MIN: f64 = 500.0;
 
 struct Mapping {
     handle: HANDLE,
@@ -154,13 +156,13 @@ impl Incident {
         self.max_speed_kmh = self.max_speed_kmh.max(speed_kmh);
     }
 
-    fn priority(&self) -> &'static str {
+    fn priority(&self) -> Option<&'static str> {
         if self.spin || self.max_impact >= 2000.0 || (self.offtrack && self.max_speed_kmh >= 180.0) {
-            "HIGH"
-        } else if self.contacts > 0 || self.offtrack {
-            "MEDIUM"
+            Some("HIGH")
+        } else if self.offtrack || self.max_impact >= CONTACT_HIGHLIGHT_MIN {
+            Some("MEDIUM")
         } else {
-            "LOW"
+            None
         }
     }
 }
@@ -303,29 +305,32 @@ fn maybe_flush_incident(st: &mut State, log: &mut std::fs::File) {
     if !ready { return; }
 
     if let Some(i) = st.incident.take() {
-        emit(
-            log,
-            &format!("INCIDENT_{}", i.priority()),
-            &format!(
-                "contacts={} | maxImpact={:.0} | offTrack={} | wheelsOff={} | spin={} | maxSpeed={:.0}km/h | {:.1}s",
-                i.contacts,
-                i.max_impact,
-                if i.offtrack { "yes" } else { "no" },
-                i.max_wheels_off,
-                if i.spin { "yes" } else { "no" },
-                i.max_speed_kmh,
-                i.started.elapsed().as_secs_f32()
-            ),
+        let details = format!(
+            "contacts={} | maxImpact={:.0} | offTrack={} | wheelsOff={} | spin={} | maxSpeed={:.0}km/h | {:.1}s",
+            i.contacts,
+            i.max_impact,
+            if i.offtrack { "yes" } else { "no" },
+            i.max_wheels_off,
+            if i.spin { "yes" } else { "no" },
+            i.max_speed_kmh,
+            i.started.elapsed().as_secs_f32()
         );
+
+        if let Some(priority) = i.priority() {
+            emit(log, &format!("INCIDENT_{}", priority), &details);
+        } else {
+            // Diagnostic only: this will NOT be eligible to trigger AutoClips.
+            emit(log, "CONTACT_FILTERED", &format!("{} | no highlight", details));
+        }
     }
 }
 
 fn main() {
     println!("============================================");
-    println!("       RISAN TELEMETRY BRIDGE v0.3");
+    println!("       RISAN TELEMETRY BRIDGE v0.4");
     println!("============================================");
     println!("Diagnostico LMU: no crea clips todavia.");
-    println!("Adelantamientos por identidad real del rival.");
+    println!("Adelantamientos confirmados + filtro de contactos leves.");
     println!("CPU objetivo: minimo | GPU: 0 | Internet: 0");
     println!("Log: RisanTelemetryEvents.log\n");
 
@@ -335,7 +340,7 @@ fn main() {
         .open("RisanTelemetryEvents.log")
         .expect("No se pudo abrir el log");
 
-    emit(&mut log, "BRIDGE_START", "v0.3 | Esperando LMU_Data");
+    emit(&mut log, "BRIDGE_START", "v0.4 | Esperando LMU_Data");
 
     loop {
         let Some(map) = Mapping::open() else {
@@ -487,11 +492,14 @@ fn main() {
             match st.last_impact_et {
                 None => st.last_impact_et = Some(impact_et),
                 Some(prev) if impact_et.is_finite() && impact_et > 0.0 && impact_et > prev + 0.001 => {
-                    let inc = incident_mut(&mut st);
-                    inc.contacts += 1;
-                    inc.max_impact = inc.max_impact.max(impact_mag.max(0.0));
-                    inc.touch(speed_kmh);
+                    // Always advance the LMU impact clock, but ignore tiny bumps/kerb noise.
                     st.last_impact_et = Some(impact_et);
+                    if impact_mag.is_finite() && impact_mag >= CONTACT_RECORD_MIN {
+                        let inc = incident_mut(&mut st);
+                        inc.contacts += 1;
+                        inc.max_impact = inc.max_impact.max(impact_mag);
+                        inc.touch(speed_kmh);
+                    }
                 }
                 _ => {}
             }
