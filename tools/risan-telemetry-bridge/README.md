@@ -1,41 +1,38 @@
-# Risan Telemetry Bridge v0.3
+# Risan Telemetry Bridge v0.4
 
 Diagnóstico ultraligero para Le Mans Ultimate. Lee la memoria compartida nativa `LMU_Data` y registra eventos útiles para Risan AutoClips.
 
-## Cambio principal de v0.3
+## Qué cambia en v0.4
 
-La confirmación de adelantamientos ya no depende del gap de telemetría.
+La v0.3 confirmó correctamente adelantamientos, pérdidas de posición e ignoró los cambios producidos en boxes. La v0.4 afina los incidentes para evitar clips por roces o golpes irrelevantes.
 
-El Bridge guarda la **identidad real (mID) del rival que ocupa la posición inmediatamente delante o detrás**. Si la posición cambia una plaza, espera 2 segundos y comprueba si ese mismo rival intercambió realmente la posición con el jugador.
+### Filtro de contactos
 
-Ejemplo:
+- Impactos inferiores a **80** se ignoran por completo como ruido/roce mínimo.
+- Un contacto aislado sin salida de pista ni trompo solo se considera highlight desde **500** de magnitud.
+- Los contactos menores de 500 quedan como `CONTACT_FILTERED` únicamente para diagnóstico y **no deben disparar AutoClips**.
+- Si existe salida de pista o trompo, el incidente sí se conserva aunque el impacto sea pequeño.
+- Impacto >= 2000, trompo o salida a alta velocidad siguen siendo `INCIDENT_HIGH`.
 
-- Tú P5 / rival X P4
-- cambio de posición
-- tú P4 / el mismo rival X P5 durante 2 s
-- resultado: `OVERTAKE_CONFIRMED`
+## Se mantiene
 
-Para una pérdida de posición se aplica el mismo criterio a la inversa.
+- `OVERTAKE_CONFIRMED` y `POSITION_LOSS_CONFIRMED` por intercambio de identidad real del rival.
+- Cambios en boxes excluidos de highlights.
+- Saltos múltiples de posición como `POSITION_CHANGE`.
+- Incidentes agrupados.
+- `CLOSE_BATTLE` con mínimo de 5 s y cooldown de 20 s.
+- 10 Hz, GPU 0, sin Internet.
 
-## Protecciones contra falsos positivos
-
-- Saltos de más de una posición siguen como `POSITION_CHANGE`.
-- No confirma si el jugador está en boxes.
-- No confirma si el rival estaba o termina en boxes.
-- No confirma si el rival desaparece de la sesión.
-- La nueva posición debe mantenerse 2 segundos.
-- Los gaps negativos siguen descartados.
-- Los incidentes continúan agrupados como `INCIDENT_LOW/MEDIUM/HIGH`.
-- `CLOSE_BATTLE` sigue teniendo mínimo 5 s y cooldown de 20 s.
-
-## Eventos
+## Eventos elegibles para futuros clips
 
 - OVERTAKE_CONFIRMED
 - POSITION_LOSS_CONFIRMED
-- POSITION_CHANGE
 - CLOSE_BATTLE
-- INCIDENT_LOW / INCIDENT_MEDIUM / INCIDENT_HIGH
+- INCIDENT_MEDIUM
+- INCIDENT_HIGH
 - RACE_FINISH
+
+`POSITION_CHANGE` y `CONTACT_FILTERED` son diagnóstico y no serán triggers de clip.
 
 ## Uso
 
@@ -45,6 +42,4 @@ Para una pérdida de posición se aplica el mismo criterio a la inversa.
 4. Cierra el Bridge al acabar.
 5. Pasa `RisanTelemetryEvents.log`.
 
-Trabaja a 10 Hz, no usa GPU y no necesita Internet.
-
-v0.3 sigue siendo diagnóstica. Cuando validemos los adelantamientos, el siguiente paso será enviar únicamente estos eventos por red local a AutoClips.
+v0.4 sigue siendo diagnóstica. Si el filtrado queda bien, el siguiente paso es enviar solo los eventos elegibles por red local al AutoClips del PC de streaming.
