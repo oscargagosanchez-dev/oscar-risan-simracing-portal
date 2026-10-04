@@ -60,6 +60,7 @@ const INCIDENT_QUIET: Duration = Duration::from_secs(3);
 const ADJACENT_DISTANCE_M: f64 = 400.0;
 const CONTACT_RECORD_MIN: f64 = 80.0;
 const CONTACT_HIGHLIGHT_MIN: f64 = 500.0;
+const POSITION_EVENT_DEDUP: Duration = Duration::from_secs(8);
 
 struct Mapping {
     handle: HANDLE,
@@ -125,6 +126,12 @@ struct PendingPosition {
     lap_dist: f64,
 }
 
+struct LastPositionEvent {
+    rival_id: i32,
+    overtake: bool,
+    at: Instant,
+}
+
 struct Incident {
     started: Instant,
     last_signal: Instant,
@@ -177,6 +184,7 @@ struct State {
     close_ahead_before: bool,
     close_behind_before: bool,
     pending_position: Option<PendingPosition>,
+    last_position_event: Option<LastPositionEvent>,
     offtrack_since: Option<Instant>,
     offtrack_active: bool,
     spin_since: Option<Instant>,
@@ -199,6 +207,7 @@ impl Default for State {
             close_ahead_before: false,
             close_behind_before: false,
             pending_position: None,
+            last_position_event: None,
             offtrack_since: None,
             offtrack_active: false,
             spin_since: None,
@@ -327,10 +336,10 @@ fn maybe_flush_incident(st: &mut State, log: &mut std::fs::File) {
 
 fn main() {
     println!("============================================");
-    println!("       RISAN TELEMETRY BRIDGE v0.4");
+    println!("       RISAN TELEMETRY BRIDGE v0.5");
     println!("============================================");
     println!("Diagnostico LMU: no crea clips todavia.");
-    println!("Adelantamientos confirmados + filtro de contactos leves.");
+    println!("Adelantamientos confirmados + deduplicacion + filtro de contactos.");
     println!("CPU objetivo: minimo | GPU: 0 | Internet: 0");
     println!("Log: RisanTelemetryEvents.log\n");
 
@@ -340,7 +349,7 @@ fn main() {
         .open("RisanTelemetryEvents.log")
         .expect("No se pudo abrir el log");
 
-    emit(&mut log, "BRIDGE_START", "v0.4 | Esperando LMU_Data");
+    emit(&mut log, "BRIDGE_START", "v0.5 | Esperando LMU_Data");
 
     loop {
         let Some(map) = Mapping::open() else {
@@ -447,15 +456,34 @@ fn main() {
 
                     match rival_now {
                         Some((rival_place, rival_in_pits)) if !rival_in_pits && rival_place == p.old => {
-                            let kind = if p.new < p.old {
-                                "OVERTAKE_CONFIRMED"
+                            let overtake = p.new < p.old;
+                            let duplicate = st.last_position_event.as_ref()
+                                .map(|e| e.rival_id == p.rival.id
+                                    && e.overtake == overtake
+                                    && e.at.elapsed() < POSITION_EVENT_DEDUP)
+                                .unwrap_or(false);
+
+                            if duplicate {
+                                emit(&mut log, "POSITION_DUPLICATE_FILTERED", &format!(
+                                    "P{} -> P{} | rival={} (id={}) | same event within {}s | no highlight",
+                                    p.old, p.new, p.rival.name, p.rival.id, POSITION_EVENT_DEDUP.as_secs()
+                                ));
                             } else {
-                                "POSITION_LOSS_CONFIRMED"
-                            };
-                            emit(&mut log, kind, &format!(
-                                "P{} -> P{} | rival={} (id={}) swapped to P{} | stable=2s | preDistance={:.0}m | lapDist={:.0}m | session={}",
-                                p.old, p.new, p.rival.name, p.rival.id, rival_place, p.rival.distance, p.lap_dist, p.session
-                            ));
+                                let kind = if overtake {
+                                    "OVERTAKE_CONFIRMED"
+                                } else {
+                                    "POSITION_LOSS_CONFIRMED"
+                                };
+                                emit(&mut log, kind, &format!(
+                                    "P{} -> P{} | rival={} (id={}) swapped to P{} | stable=2s | preDistance={:.0}m | lapDist={:.0}m | session={}",
+                                    p.old, p.new, p.rival.name, p.rival.id, rival_place, p.rival.distance, p.lap_dist, p.session
+                                ));
+                                st.last_position_event = Some(LastPositionEvent {
+                                    rival_id: p.rival.id,
+                                    overtake,
+                                    at: Instant::now(),
+                                });
+                            }
                             st.pending_position = None;
                         }
                         Some((rival_place, rival_in_pits)) => {
