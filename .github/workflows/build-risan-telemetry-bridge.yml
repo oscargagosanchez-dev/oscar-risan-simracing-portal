@@ -26,6 +26,6 @@ jobs:
           Copy-Item README.md dist\LEEME.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Risan-Telemetry-Bridge-v0.1
+          name: Risan-Telemetry-Bridge-v0.2
           path: tools/risan-telemetry-bridge/dist/*
           if-no-files-found: error
