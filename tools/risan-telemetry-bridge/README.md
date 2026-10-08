@@ -1,48 +1,64 @@
-# Risan Telemetry Bridge v0.5
+# Risan Telemetry Bridge v0.6
 
-Diagnóstico ultraligero para Le Mans Ultimate. Lee la memoria compartida nativa `LMU_Data` y registra eventos útiles para Risan AutoClips.
+Esta versión deja de mantener su propia lógica LMU aislada.
 
-## Qué cambia en v0.5
+El lector y la interpretación común pasan a **Risan LMU Data Bridge Core**, siguiendo la especificación compartida definida para LMU Hub.
 
-La v0.4 ya filtraba correctamente contactos leves. En la última prueba apareció el mismo adelantamiento al mismo rival dos veces con pocos segundos de diferencia, así que v0.5 añade deduplicación específica de eventos de posición.
+## Arquitectura
 
-### Deduplicación de adelantamientos y pérdidas
+`LMU_Data -> Risan LMU Data Bridge Core -> consumidores`
 
-- Si el mismo rival genera el mismo tipo de evento otra vez dentro de **8 segundos**, el segundo se marca como `POSITION_DUPLICATE_FILTERED`.
-- Ese evento duplicado queda solo en el log y **no será elegible para AutoClips**.
-- Un evento contrario sí se conserva. Ejemplo: adelantas a un rival y 4 s después él te vuelve a pasar; son dos acciones reales diferentes.
-- La confirmación por identidad real del rival y estabilidad de 2 s se mantiene.
+Consumidores previstos:
+- LMU Hub
+- Team Radio
+- AutoClips
+- Spotter
+- Broadcast
+- Strategy / Race Events
 
-## Filtro de contactos
+Risan Telemetry Bridge es ahora un adaptador de diagnóstico para AutoClips: consume el Core común y escribe los eventos en `RisanTelemetryEvents.log`.
 
-- Impactos inferiores a **80** se ignoran.
-- Contacto aislado sin salida/trompo solo es highlight desde **500**.
-- Contactos menores quedan como `CONTACT_FILTERED`.
-- Salida de pista o trompo conserva el incidente aunque el impacto sea menor.
-- Impactos >= 2000, trompo o salida rápida siguen siendo `INCIDENT_HIGH`.
+## Contrato compartido
 
-## Eventos elegibles para futuros clips
+Cada evento expone:
+- schema_version
+- kind
+- details
+- highlight_eligible
+- priority
 
-- OVERTAKE_CONFIRMED
-- POSITION_LOSS_CONFIRMED
+Además el Core expone un snapshot común con:
+- session
+- place
+- in_pits
+- lap_dist
+- speed_kmh
+- gap_ahead_s
+- gap_behind_s
+
+## Lógica centralizada
+
+Se ha movido al Core común:
+- lectura de `LMU_Data`
+- detección de jugador
+- identificación de rivales
+- confirmación de adelantamientos/pérdidas
+- exclusión de boxes
+- deduplicación
+- gaps válidos
 - CLOSE_BATTLE
-- INCIDENT_MEDIUM
-- INCIDENT_HIGH
-- RACE_FINISH
+- contacto / off-track / spin
+- agrupación y prioridad de incidentes
 
-No elegibles:
-- POSITION_CHANGE
-- POSITION_DUPLICATE_FILTERED
-- CONTACT_FILTERED
+AutoClips ya no debe duplicar estas reglas.
 
-## Uso
+## Recursos
 
-1. LMU -> Settings -> Gameplay -> **Enable Plugins** activado.
-2. Ejecuta `RisanTelemetryBridge.exe` en el PC donde corre LMU.
-3. Haz una tanda normal.
-4. Cierra el Bridge al acabar.
-5. Pasa `RisanTelemetryEvents.log`.
+- 10 Hz
+- GPU: 0
+- Internet: 0
+- procesamiento local
 
-Sigue trabajando a 10 Hz, sin GPU y sin Internet.
+## Próximo paso
 
-Si v0.5 valida la deduplicación, el siguiente paso es conectar estos eventos por red local con Risan AutoClips en el PC de streaming.
+La conexión por red local con AutoClips deberá transportar estos mismos eventos del Core, sin volver a implementar detección de carrera dentro de AutoClips.
