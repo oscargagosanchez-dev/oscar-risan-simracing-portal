@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'tools/risan-telemetry-bridge/**'
+      - 'shared/risan-lmu-data-bridge-core/**'
       - '.github/workflows/build-risan-telemetry-bridge.yml'
 
 jobs:
@@ -26,6 +27,6 @@ jobs:
           Copy-Item README.md dist\LEEME.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Risan-Telemetry-Bridge-v0.5
+          name: Risan-Telemetry-Bridge-v0.6
           path: tools/risan-telemetry-bridge/dist/*
           if-no-files-found: error
