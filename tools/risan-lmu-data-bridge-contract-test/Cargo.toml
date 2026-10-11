@@ -1,0 +1,15 @@
+[package]
+name = "risan-lmu-data-bridge-contract-test"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[dependencies]
+risan-lmu-data-bridge-core = { path = "../../shared/risan-lmu-data-bridge-core" }
+serde_json = "1"
