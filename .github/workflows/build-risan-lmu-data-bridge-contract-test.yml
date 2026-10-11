@@ -1,0 +1,33 @@
+name: Build Risan LMU Data Bridge Contract Test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/risan-lmu-data-bridge-contract-test/**'
+      - 'shared/risan-lmu-data-bridge-core/**'
+      - '.github/workflows/build-risan-lmu-data-bridge-contract-test.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tools/risan-lmu-data-bridge-contract-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build release
+        run: cargo build --release
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target\release\risan-lmu-data-bridge-contract-test.exe dist\RisanLmuDataBridgeContractTest.exe
+          Copy-Item README.md dist\LEEME.txt
+          Copy-Item risan-project.json dist\risan-project.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Risan-LMU-Data-Bridge-Contract-Test-v0.1
+          path: tools/risan-lmu-data-bridge-contract-test/dist/*
+          if-no-files-found: error
