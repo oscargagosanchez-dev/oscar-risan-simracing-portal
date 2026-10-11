@@ -1,6 +1,6 @@
 [package]
 name = "risan-telemetry-bridge"
-version = "0.6.0"
+version = "0.5.0"
 edition = "2021"
 
 [profile.release]
@@ -11,5 +11,4 @@ panic = "abort"
 strip = true
 
 [dependencies]
-risan-lmu-data-bridge-core = { path = "../../shared/risan-lmu-data-bridge-core" }
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_SystemInformation"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_System_SystemInformation"] }
