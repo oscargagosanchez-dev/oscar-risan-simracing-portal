@@ -1,0 +1,28 @@
+{
+  "nombre": "Risan LMU Data Bridge Contract Test",
+  "version": "0.1.0",
+  "contrato": "Risan LMU Data Bridge v0.1",
+  "estado": "validacion",
+  "ultimo_cambio": "Contrato comun con driver change, posicion general/clase, pit entry/exit, incidentes, banderas, gaps, vueltas, timestamps, freshness y deduplicacion.",
+  "bugs_abiertos": [
+    "Validar class_position en parrilla multiclase real.",
+    "Validar DRIVER_CHANGE en resistencia por equipos.",
+    "Validar banderas y freshness durante una sesion larga."
+  ],
+  "bugs_corregidos": [],
+  "tareas_pendientes": [
+    "Prueba normal de contrato.",
+    "Prueba multiclase.",
+    "Prueba de resistencia por equipos con cambio de piloto.",
+    "Comparar eventos con LMU Hub Live Bridge sin sustituirlo."
+  ],
+  "siguiente_objetivo": "Validar el contrato comun sin sustituir AutoClips Bridge ni LMU Hub Live Bridge.",
+  "ultima_actualizacion": "2026-10-11",
+  "ruta": "tools/risan-lmu-data-bridge-contract-test",
+  "dependencias": [
+    "shared/risan-lmu-data-bridge-core",
+    "Le Mans Ultimate LMU_Data"
+  ],
+  "local": true,
+  "creditos": false
+}
