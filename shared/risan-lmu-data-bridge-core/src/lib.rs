@@ -11,7 +11,7 @@ use windows_sys::Win32::{
 };
 
 pub const CONTRACT_VERSION: &str = "0.1";
-pub const CORE_VERSION: &str = "0.1.1";
+pub const CORE_VERSION: &str = "0.1.2";
 pub const SOURCE_NAME: &str = "LMU_Data";
 pub const SOURCE_BRIDGE: &str = "risan-lmu-data-bridge-core";
 pub const FRESHNESS_TARGET_MS: u64 = 500;
@@ -250,7 +250,7 @@ struct State {
     last_in_pits: Option<bool>,
     last_driver_name: Option<String>,
     last_car_id: Option<i32>,
-    last_flags: Option<(u8, i8, [i8; 3])>,
+    last_flags: Option<(u8, i8)>,
 
     last_impact_et: Option<f64>,
     last_ahead: Option<RivalSnapshot>,
@@ -431,7 +431,12 @@ impl LmuDataBridgeCore {
         self.st.last_class_position = class_position;
 
         // Common flags state.
-        let flag_state = (game_phase, yellow_flag_state, sector_flags);
+        // v0.1.2: sector flag bytes remain available in snapshots as raw data,
+        // but they do NOT emit events yet. The first contract test showed these
+        // bytes oscillating between values such as 1/11 without a global yellow,
+        // creating hundreds of false/noisy FLAG_STATE events. Until their LMU
+        // semantics are validated, only stable global state changes emit events.
+        let flag_state = (game_phase, yellow_flag_state);
         if self.st.last_flags.map(|f| f != flag_state).unwrap_or(true) {
             push_event(
                 &mut events,
@@ -439,12 +444,9 @@ impl LmuDataBridgeCore {
                 false,
                 70,
                 100,
+                format!("flags:{}:{}:{}", session, game_phase, yellow_flag_state),
                 format!(
-                    "flags:{}:{}:{}:{}:{}",
-                    session, game_phase, yellow_flag_state, sector_flags[0], sector_flags[1]
-                ),
-                format!(
-                    "game_phase={} | yellow={} | sectors={:?}",
+                    "game_phase={} | yellow={} | sector_flags_raw={:?}",
                     game_phase, yellow_flag_state, sector_flags
                 ),
                 base_ctx.clone(),
@@ -886,11 +888,18 @@ fn find_vehicle_id(map: &Mapping, id: i32) -> Option<usize> {
     (0..n).find(|&i| map.read::<i32>(OFF_VEH_SCORING + i * SCORING_STRIDE + SC_ID) == id)
 }
 
-fn race_distance(map: &Mapping, scoring_idx: usize, lap_len: f64) -> f64 {
-    let base = OFF_VEH_SCORING + scoring_idx * SCORING_STRIDE;
-    let laps = map.read::<i16>(base + SC_TOTAL_LAPS).max(0) as f64;
-    let dist = map.read::<f64>(base + SC_LAP_DIST);
-    if lap_len.is_finite() && lap_len > 100.0 { laps * lap_len + dist } else { dist }
+fn track_proximity_m(map: &Mapping, a_idx: usize, b_idx: usize, lap_len: f64) -> f64 {
+    let a_base = OFF_VEH_SCORING + a_idx * SCORING_STRIDE;
+    let b_base = OFF_VEH_SCORING + b_idx * SCORING_STRIDE;
+    let a = map.read::<f64>(a_base + SC_LAP_DIST);
+    let b = map.read::<f64>(b_base + SC_LAP_DIST);
+    let direct = (a - b).abs();
+
+    if lap_len.is_finite() && lap_len > 100.0 && direct <= lap_len {
+        direct.min((lap_len - direct).abs())
+    } else {
+        direct
+    }
 }
 
 fn rival_at_place(map: &Mapping, place: u8, player_idx: usize, lap_len: f64) -> Option<RivalSnapshot> {
@@ -900,13 +909,11 @@ fn rival_at_place(map: &Mapping, place: u8, player_idx: usize, lap_len: f64) -> 
     let id = map.read::<i32>(base + SC_ID);
     let name = map.read_name(base + SC_DRIVER_NAME, 32);
     let in_pits = map.read::<u8>(base + SC_IN_PITS) != 0;
-    let player_distance = race_distance(map, player_idx, lap_len);
-    let rival_distance = race_distance(map, idx, lap_len);
     Some(RivalSnapshot {
         id,
         name,
         in_pits,
-        distance: (player_distance - rival_distance).abs(),
+        distance: track_proximity_m(map, player_idx, idx, lap_len),
     })
 }
 
