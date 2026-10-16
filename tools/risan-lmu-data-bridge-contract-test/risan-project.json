@@ -1,26 +1,30 @@
 {
   "nombre": "Risan LMU Data Bridge Contract Test",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "contrato": "Risan LMU Data Bridge v0.1",
   "estado": "validacion",
-  "ultimo_cambio": "Contrato comun con driver change, posicion general/clase, pit entry/exit, incidentes, banderas, gaps, vueltas, timestamps, freshness y deduplicacion.",
+  "ultimo_cambio": "Filtrado de FLAG_STATE, proximidad circular en pista y log limpio por prueba.",
   "bugs_abiertos": [
     "Validar class_position en parrilla multiclase real.",
     "Validar DRIVER_CHANGE en resistencia por equipos.",
-    "Validar banderas y freshness durante una sesion larga."
+    "Validar significado de sector_flags_raw antes de convertirlos en eventos comunes."
   ],
-  "bugs_corregidos": [],
+  "bugs_corregidos": [
+    "FLAG_STATE ruidoso por oscilaciones de bytes sectoriales.",
+    "preDistance irreal por mezclar distancia de carrera con proximidad fisica.",
+    "JSONL acumulaba ejecuciones anteriores."
+  ],
   "tareas_pendientes": [
-    "Prueba normal de contrato.",
+    "Prueba corta v0.1.1.",
     "Prueba multiclase.",
     "Prueba de resistencia por equipos con cambio de piloto.",
     "Comparar eventos con LMU Hub Live Bridge sin sustituirlo."
   ],
-  "siguiente_objetivo": "Validar el contrato comun sin sustituir AutoClips Bridge ni LMU Hub Live Bridge.",
-  "ultima_actualizacion": "2026-10-11",
+  "siguiente_objetivo": "Validar v0.1.1 y reservar la prueba de resistencia para DRIVER_CHANGE.",
+  "ultima_actualizacion": "2026-10-16",
   "ruta": "tools/risan-lmu-data-bridge-contract-test",
   "dependencias": [
-    "shared/risan-lmu-data-bridge-core",
+    "shared/risan-lmu-data-bridge-core 0.1.2",
     "Le Mans Ultimate LMU_Data"
   ],
   "local": true,
