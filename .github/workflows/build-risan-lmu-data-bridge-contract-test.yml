@@ -28,6 +28,6 @@ jobs:
           Copy-Item risan-project.json dist\risan-project.json
       - uses: actions/upload-artifact@v4
         with:
-          name: Risan-LMU-Data-Bridge-Contract-Test-v0.1
+          name: Risan-LMU-Data-Bridge-Contract-Test-v0.1.1
           path: tools/risan-lmu-data-bridge-contract-test/dist/*
           if-no-files-found: error
