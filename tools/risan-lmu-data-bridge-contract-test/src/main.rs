@@ -26,25 +26,25 @@ fn write_json_line(file: &mut std::fs::File, value: serde_json::Value) {
 
 fn main() {
     println!("====================================================");
-    println!(" RISAN LMU DATA BRIDGE v0.1.1 - CONTRACT TEST");
+    println!(" RISAN LMU DATA BRIDGE v0.1.2 - CONTRACT TEST");
     println!("====================================================");
     println!("NO sustituye AutoClips Bridge ni LMU Hub Live Bridge.");
     println!("Contrato: {} | Core: {}", CONTRACT_VERSION, CORE_VERSION);
     println!("Fuente: {}", SOURCE_NAME);
     println!("Freshness objetivo: <= {} ms", FRESHNESS_TARGET_MS);
     println!("Local, sin GPU, sin Internet, sin creditos.");
-    println!("Log JSONL: RisanLmuDataBridgeContract_v0_1.jsonl\n");
+    println!("Log JSONL: RisanLmuDataBridgeContract_v0_1_2.jsonl\n");
 
     let mut log = OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open("RisanLmuDataBridgeContract_v0_1_1.jsonl")
+        .open("RisanLmuDataBridgeContract_v0_1_2.jsonl")
         .expect("No se pudo abrir el log");
 
     write_json_line(&mut log, json!({
         "record_type": "contract_test_start",
-        "contract_test_version": "0.1.1",
+        "contract_test_version": "0.1.2",
         "contract_version": CONTRACT_VERSION,
         "core_version": CORE_VERSION,
         "source": SOURCE_NAME,
