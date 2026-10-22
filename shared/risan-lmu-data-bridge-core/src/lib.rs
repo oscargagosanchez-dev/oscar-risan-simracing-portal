@@ -11,7 +11,7 @@ use windows_sys::Win32::{
 };
 
 pub const CONTRACT_VERSION: &str = "0.1";
-pub const CORE_VERSION: &str = "0.1.2";
+pub const CORE_VERSION: &str = "0.1.3";
 pub const SOURCE_NAME: &str = "LMU_Data";
 pub const SOURCE_BRIDGE: &str = "risan-lmu-data-bridge-core";
 pub const FRESHNESS_TARGET_MS: u64 = 500;
@@ -243,6 +243,8 @@ impl Incident {
 struct State {
     scoring_idx: Option<usize>,
 
+    last_session: Option<i32>,
+    last_session_timestamp_s: Option<f64>,
     last_place: u8,
     last_class_position: Option<u8>,
     last_finish: i8,
@@ -344,6 +346,60 @@ impl LmuDataBridgeCore {
             lap: Some(lap),
             in_pits: Some(in_pits),
         };
+
+        // Session boundary detection.
+        // LMU can restart/reload a session while mSession keeps the same value.
+        // Therefore we use both the session code and a clear rewind of elapsed
+        // session time. A lap regression is included as supporting evidence.
+        let prev_session = self.st.last_session;
+        let prev_session_ts = self.st.last_session_timestamp_s;
+        let prev_lap = self.st.last_lap;
+        let prev_car_id = self.st.last_car_id;
+
+        let session_changed = prev_session.map(|v| v != session).unwrap_or(false);
+        let time_rewound = prev_session_ts
+            .map(|v| session_ts.is_finite() && v.is_finite() && session_ts + 5.0 < v)
+            .unwrap_or(false);
+        let lap_rewound = prev_lap
+            .map(|v| v > 0 && lap + 1 < v)
+            .unwrap_or(false);
+
+        if session_changed || time_rewound || lap_rewound {
+            let event_type = if session_changed { "SESSION_CHANGE" } else { "SESSION_RESET" };
+            let old_session = prev_session.unwrap_or(session);
+            let old_ts = prev_session_ts.unwrap_or(session_ts);
+            let old_lap = prev_lap.unwrap_or(lap);
+            let old_car = prev_car_id.unwrap_or(car_id);
+
+            push_event(
+                &mut events,
+                event_type,
+                false,
+                100,
+                100,
+                format!(
+                    "session-boundary:{}:{}:{}:{}:{}",
+                    old_session, session, old_car, car_id, (session_ts * 10.0) as i64
+                ),
+                format!(
+                    "session {} -> {} | time {:.1}s -> {:.1}s | lap {} -> {} | car {} -> {} | time_rewound={} | lap_rewound={}",
+                    old_session, session, old_ts, session_ts, old_lap, lap, old_car, car_id, time_rewound, lap_rewound
+                ),
+                base_ctx.clone(),
+            );
+
+            // Do not let stale state from the previous session generate false
+            // pit, driver, lap, position, battle or incident events.
+            self.st = State {
+                scoring_idx: Some(s_idx),
+                last_session: Some(session),
+                last_session_timestamp_s: Some(session_ts),
+                ..State::default()
+            };
+        } else {
+            self.st.last_session = Some(session);
+            self.st.last_session_timestamp_s = Some(session_ts);
+        }
 
         // Common state event: driver change, intentionally independent of AutoClips highlight logic.
         if let (Some(prev_car), Some(prev_driver)) = (self.st.last_car_id, self.st.last_driver_name.as_ref()) {
