@@ -11,7 +11,7 @@ use windows_sys::Win32::{
 };
 
 pub const CONTRACT_VERSION: &str = "0.1";
-pub const CORE_VERSION: &str = "0.1.3";
+pub const CORE_VERSION: &str = "0.1.4";
 pub const SOURCE_NAME: &str = "LMU_Data";
 pub const SOURCE_BRIDGE: &str = "risan-lmu-data-bridge-core";
 pub const FRESHNESS_TARGET_MS: u64 = 500;
@@ -57,6 +57,7 @@ const W_SURFACE_TYPE: usize = 176;
 
 const POSITION_CONFIRM: Duration = Duration::from_secs(2);
 const POSITION_EVENT_DEDUP: Duration = Duration::from_secs(8);
+const POST_SESSION_POSITION_GUARD: Duration = Duration::from_secs(5);
 const BATTLE_MIN: Duration = Duration::from_secs(5);
 const BATTLE_COOLDOWN: Duration = Duration::from_secs(20);
 const INCIDENT_QUIET: Duration = Duration::from_secs(3);
@@ -259,6 +260,7 @@ struct State {
     last_behind: Option<RivalSnapshot>,
     pending_position: Option<PendingPosition>,
     last_position_event: Option<LastPositionEvent>,
+    position_highlight_guard_until: Option<Instant>,
 
     offtrack_since: Option<Instant>,
     offtrack_active: bool,
@@ -394,6 +396,7 @@ impl LmuDataBridgeCore {
                 scoring_idx: Some(s_idx),
                 last_session: Some(session),
                 last_session_timestamp_s: Some(session_ts),
+                position_highlight_guard_until: Some(Instant::now() + POST_SESSION_POSITION_GUARD),
                 ..State::default()
             };
         } else {
@@ -510,6 +513,28 @@ impl LmuDataBridgeCore {
             self.st.last_flags = Some(flag_state);
         }
 
+        // Cancel any pending pass/loss as soon as the player is in pits.
+        // This prevents a pass that started on track from being confirmed two
+        // seconds later after ESC->Box or a normal pit entry.
+        if in_pits {
+            if let Some(p) = self.st.pending_position.take() {
+                push_event(
+                    &mut events,
+                    "POSITION_PENDING_CANCELLED",
+                    false,
+                    0,
+                    100,
+                    format!("position-cancelled:{}:{}:{}:pits", car_id, p.old, p.new),
+                    format!("P{} -> P{} pending vs {} cancelled because player entered pits", p.old, p.new, p.rival.name),
+                    base_ctx.clone(),
+                );
+            }
+        }
+
+        let position_guarded = self.st.position_highlight_guard_until
+            .map(|until| Instant::now() < until)
+            .unwrap_or(false);
+
         // Existing, validated AutoClips-compatible position confirmation logic.
         if self.st.last_place != 0 && place != 0 && place != self.st.last_place {
             let delta = place as i16 - self.st.last_place as i16;
@@ -521,7 +546,7 @@ impl LmuDataBridgeCore {
                 None
             };
 
-            if delta.abs() == 1 && !in_pits {
+            if delta.abs() == 1 && !in_pits && !position_guarded {
                 if let Some(rival) = rival {
                     if !rival.in_pits {
                         self.st.pending_position = Some(PendingPosition {
@@ -566,13 +591,40 @@ impl LmuDataBridgeCore {
                     0,
                     100,
                     format!("position-change:{}:{}:{}", car_id, self.st.last_place, place),
-                    format!("P{} -> P{} | delta={} | pits={} | no highlight", self.st.last_place, place, delta, in_pits),
+                    format!("P{} -> P{} | delta={} | pits={} | sessionGuard={} | no highlight", self.st.last_place, place, delta, in_pits, position_guarded),
                     base_ctx.clone(),
                 );
                 self.st.pending_position = None;
             }
         }
         self.st.last_place = place;
+
+        if position_guarded || in_pits {
+            if let Some(p) = self.st.pending_position.take() {
+                push_event(
+                    &mut events,
+                    "POSITION_PENDING_CANCELLED",
+                    false,
+                    0,
+                    100,
+                    format!(
+                        "position-cancelled:{}:{}:{}:{}",
+                        car_id,
+                        p.old,
+                        p.new,
+                        if in_pits { "pits" } else { "session-guard" }
+                    ),
+                    format!(
+                        "P{} -> P{} pending vs {} cancelled because {}",
+                        p.old,
+                        p.new,
+                        p.rival.name,
+                        if in_pits { "player is in pits" } else { "session transition guard is active" }
+                    ),
+                    base_ctx.clone(),
+                );
+            }
+        }
 
         if let Some(p) = &self.st.pending_position {
             if place != p.new {
